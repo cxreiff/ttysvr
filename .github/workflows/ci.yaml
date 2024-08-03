@@ -1,0 +1,97 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: --deny warnings
+  RUSTDOCFLAGS: --deny warnings
+
+jobs:
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: populate target directory from cache
+        uses: Leafwing-Studios/cargo-cache@v2
+
+      - name: free disk space
+        uses: jlumbroso/free-disk-space@main
+
+      - name: run tests
+        run: |
+          cargo test --workspace --all-features --all-targets --locked
+          # Workaround for https://github.com/rust-lang/cargo/issues/6669
+          cargo test --workspace --all-features --doc --locked
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: install dependencies
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: populate target directory from cache
+        uses: Leafwing-Studios/cargo-cache@v2
+
+      - name: run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- --deny warnings
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: run cargo fmt
+        run: cargo fmt --all -- --check
+
+  doc:
+    name: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install dependencies
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+      - name: populate target directory from cache
+        uses: Leafwing-Studios/cargo-cache@v2
+
+      - name: check documentation
+        run: cargo doc --workspace --all-features --document-private-items --no-deps
