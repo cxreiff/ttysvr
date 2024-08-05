@@ -6,6 +6,7 @@ use bevy_ratatui_render::RatatuiRenderPlugin;
 use rand::{distributions::Standard, prelude::Distribution, Rng};
 use ratatui::crossterm::terminal;
 
+mod bubbles;
 mod common;
 mod maze;
 mod pipes;
@@ -41,6 +42,7 @@ impl Plugin for AppPlugin {
         app.add_plugins(match self.0 {
             SaverVariant::Maze => maze::plugin,
             SaverVariant::Pipes => pipes::plugin,
+            SaverVariant::Bubbles => bubbles::plugin,
         });
     }
 }
@@ -53,13 +55,15 @@ pub struct Flags {
 pub enum SaverVariant {
     Maze,
     Pipes,
+    Bubbles,
 }
 
 impl Distribution<SaverVariant> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> SaverVariant {
-        match rng.gen_range(0..=1) {
+        match rng.gen_range(0..=2) {
             0 => SaverVariant::Maze,
-            _ => SaverVariant::Pipes,
+            1 => SaverVariant::Pipes,
+            _ => SaverVariant::Bubbles,
         }
     }
 }

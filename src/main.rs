@@ -9,17 +9,31 @@ use ttysvr::{AppPlugin, SaverVariant};
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]
-    variant: Variant,
+    variant: Option<Variant>,
 
-    #[arg(short, long, global = true, name = "DELAY")]
+    #[arg(
+        short,
+        long,
+        global = true,
+        name = "DELAY",
+        help = "Prints command for initiating ttysvr in DELAY seconds."
+    )]
     init: Option<u32>,
+
+    #[arg(
+        short,
+        long,
+        global = true,
+        help = "Prints command for cancelling ttysvr in current shell."
+    )]
+    cancel: bool,
 }
 
 #[derive(Subcommand)]
 pub enum Variant {
     Maze,
     Pipes,
-    Shuffle,
+    Bubbles,
 }
 
 impl Display for Variant {
@@ -27,34 +41,56 @@ impl Display for Variant {
         match self {
             Variant::Maze => write!(f, "maze"),
             Variant::Pipes => write!(f, "pipes"),
-            Variant::Shuffle => write!(f, "shuffle"),
+            Variant::Bubbles => write!(f, "bubbles"),
         }
     }
 }
 
 fn main() {
-    let Cli { variant, init } = Cli::parse();
+    let Cli {
+        variant,
+        init,
+        cancel,
+    } = Cli::parse();
 
     let saver_variant = match variant {
-        Variant::Maze => SaverVariant::Maze,
-        Variant::Pipes => SaverVariant::Pipes,
-        Variant::Shuffle => rand::random(),
+        Some(Variant::Maze) => SaverVariant::Maze,
+        Some(Variant::Pipes) => SaverVariant::Pipes,
+        Some(Variant::Bubbles) => SaverVariant::Bubbles,
+        None => rand::random(),
     };
 
     if let Some(delay) = init {
-        let executable = env::args().next().unwrap_or("ttysvr".into());
+        let executable_string = env::args().next().unwrap_or("ttysvr".into());
+        let variant_string = match variant {
+            None => "".into(),
+            Some(variant) => format!(" {variant}"),
+        };
 
         #[rustfmt::skip]
         println!(
 "
-TMOUT={delay}; trap \"{executable} {variant}; zle reset-prompt\" ALRM
+TMOUT={delay}; trap \"{executable_string}{variant_string}; zle reset-prompt\" ALRM
 
 # WRAP THIS COMMAND IN EVAL WITH BACKTICKS (ZSH ONLY)
-# EXAMPLE: eval `ttysvr {variant} --init {delay}`
+# EXAMPLE: eval `ttysvr{variant_string} --init {delay}`
 "
         );
         return;
     };
+
+    if cancel {
+        #[rustfmt::skip]
+        println!(
+"
+TMOUT=0
+
+# WRAP THIS COMMAND IN EVAL WITH BACKTICKS (ZSH ONLY)
+# EXAMPLE: eval `ttysvr --cancel`
+"
+        );
+        return;
+    }
 
     App::new().add_plugins(AppPlugin(saver_variant)).run();
 }
