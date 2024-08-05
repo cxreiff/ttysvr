@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{env, fmt::Display};
 
 use bevy::app::App;
 use clap::{Parser, Subcommand};
@@ -9,62 +9,52 @@ use ttysvr::{AppPlugin, SaverVariant};
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]
-    subcommand: Subcommands,
+    variant: Variant,
+
+    #[arg(short, long, global = true, name = "DELAY")]
+    init: Option<u32>,
 }
 
 #[derive(Subcommand)]
-pub enum Subcommands {
-    Run {
-        #[command(subcommand)]
-        variant: Variant,
-    },
-    Init,
-}
-
-#[derive(Clone, Subcommand)]
 pub enum Variant {
     Maze,
     Pipes,
+    Shuffle,
 }
 
 impl Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Variant::Maze { .. } => write!(f, "maze"),
-            Variant::Pipes { .. } => write!(f, "pipes"),
+            Variant::Maze => write!(f, "maze"),
+            Variant::Pipes => write!(f, "pipes"),
+            Variant::Shuffle => write!(f, "shuffle"),
         }
     }
 }
 
 fn main() {
-    let Cli { subcommand } = Cli::parse();
+    let Cli { variant, init } = Cli::parse();
 
-    match subcommand {
-        Subcommands::Run { variant } => {
-            let saver_variant = match variant {
-                Variant::Maze => SaverVariant::Maze,
-                Variant::Pipes => SaverVariant::Pipes,
-            };
+    let saver_variant = match variant {
+        Variant::Maze => SaverVariant::Maze,
+        Variant::Pipes => SaverVariant::Pipes,
+        Variant::Shuffle => rand::random(),
+    };
 
-            App::new().add_plugins(AppPlugin(saver_variant)).run();
-        }
-        Subcommands::Init => {
-            #[rustfmt::skip]
-            println!(
+    if let Some(delay) = init {
+        let executable = env::args().next().unwrap_or("ttysvr".into());
+
+        #[rustfmt::skip]
+        println!(
 "
-# ttysvr
-#
-# Append this command's output to .zshrc
-# e.g. `ttysaver init >> ~/.zshrc && source ~/.zshrc`
-#
-# call with `svr [variant] [seconds]`
-# e.g. `svr maze 1000` for maze screensaver after 1000 seconds.
-#
-svr() {{ TMOUT=$2; trap \"cargo run -- run $1; zle reset-prompt\" ALRM }}
-svr_off() {{ TMOUT=0 }}
-# ttysvr end
+TMOUT={delay}; trap \"{executable} {variant}; zle reset-prompt\" ALRM
+
+# WRAP THIS COMMAND IN EVAL WITH BACKTICKS (ZSH ONLY)
+# EXAMPLE: eval `ttysvr {variant} --init {delay}`
 "
-            );
-        }
-    }
+        );
+        return;
+    };
+
+    App::new().add_plugins(AppPlugin(saver_variant)).run();
 }

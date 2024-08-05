@@ -11,18 +11,28 @@ fn maze_setup_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn(Camera3dBundle {
-        camera: Camera {
-            target: ratatui_render.target("main").unwrap_or_default(),
+    commands
+        .spawn(Camera3dBundle {
+            camera: Camera {
+                target: ratatui_render.target("main").unwrap_or_default(),
+                ..default()
+            },
+            transform: Transform::from_xyz(0., 5., 0.).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
-        },
-        transform: Transform::from_xyz(0., 5., 0.).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+        })
+        .with_children(|commands| {
+            commands.spawn(PointLightBundle {
+                point_light: PointLight {
+                    intensity: 100_000.,
+                    ..default()
+                },
+                ..default()
+            });
+        });
 
     commands.spawn(PbrBundle {
         mesh: meshes.add(Cuboid::from_size(Vec3::splat(1.))),
-        material: materials.add(StandardMaterial::from_color(Color::hsl(220., 0.8, 0.5))),
+        material: materials.add(StandardMaterial::from_color(Color::hsl(0., 0.5, 0.5))),
         ..default()
     });
 }
