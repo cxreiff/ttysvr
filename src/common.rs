@@ -10,7 +10,7 @@ use crate::Flags;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
-        PostUpdate,
+        Update,
         (
             draw_scene_system.map(error),
             handle_keyboard_system,
@@ -28,6 +28,16 @@ fn draw_scene_system(
     ratatui.draw(|frame| {
         if let Some(widget) = ratatui_render.widget("main") {
             frame.render_widget(widget, frame.size());
+
+            // frame.render_widget(
+            //     Paragraph::new(flags.msgs.join("\n")).fg(Color::DarkRed),
+            //     ratatui::layout::Rect {
+            //         x: 1,
+            //         y: 1,
+            //         width: 30,
+            //         height: 30,
+            //     },
+            // );
         }
     })?;
 

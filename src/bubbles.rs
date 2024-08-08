@@ -1,28 +1,163 @@
+use avian2d::{
+    math::{Scalar, Vector},
+    prelude::{Collider, Gravity, LinearVelocity, LockedAxes, RigidBody},
+    PhysicsPlugins,
+};
 use bevy::prelude::*;
+use bevy_ratatui::event::ResizeEvent;
 use bevy_ratatui_render::RatatuiRenderContext;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
+
+const ORTHO_SCALING: f32 = 0.5;
+const BUBBLE_RATE: f32 = 1.;
+const BUBBLE_MAX_SPAWN: u32 = 16;
+const BUBBLE_MAX_SPEED: f32 = 45.;
+const BUBBLE_RADIUS: f32 = 10.;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, bubbles_setup_system);
+    app.add_plugins(PhysicsPlugins::default().with_length_unit(128.))
+        .insert_resource(Gravity(Vector::ZERO))
+        .init_resource::<BubbleVisibleRegion>()
+        .add_systems(Startup, bubbles_setup_system)
+        .add_systems(
+            Update,
+            (
+                bubbles_spawn_system,
+                handle_resize_system,
+                bubble_movement_system,
+            ),
+        );
+}
+
+#[derive(Component)]
+pub struct Bubble;
+
+#[derive(Resource, Deref, DerefMut)]
+pub struct BubbleRng(ChaCha8Rng);
+
+#[derive(Resource, Deref)]
+pub struct BubbleSprite(Handle<Image>);
+
+#[derive(Resource, Deref, DerefMut, Default)]
+pub struct BubbleVisibleRegion(Vec2);
+
+#[derive(Bundle)]
+pub struct BubbleBundle {
+    bubble: Bubble,
+    sprite: SpriteBundle,
+    rigidbody: RigidBody,
+    collider: Collider,
+    locked_axes: LockedAxes,
+}
+
+impl BubbleBundle {
+    fn new(rng: &mut BubbleRng, sprite: &BubbleSprite, region: &Rectangle) -> Self {
+        Self {
+            bubble: Bubble,
+            sprite: SpriteBundle {
+                transform: Transform::from_translation(
+                    region.sample_interior(&mut rng.0).extend(0.),
+                ),
+                texture: (**sprite).clone(),
+                sprite: Sprite {
+                    color: Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.8),
+                    custom_size: Some(Vec2::splat(BUBBLE_RADIUS * 2.)),
+                    ..default()
+                },
+                ..default()
+            },
+            rigidbody: RigidBody::Dynamic,
+            collider: Collider::circle(BUBBLE_RADIUS as Scalar),
+            locked_axes: LockedAxes::ROTATION_LOCKED,
+        }
+    }
+}
+
+#[derive(Resource, Deref, DerefMut)]
+pub struct BubbleTimer(Timer);
+
+impl Default for BubbleTimer {
+    fn default() -> Self {
+        Self(Timer::from_seconds(BUBBLE_RATE, TimerMode::Repeating))
+    }
 }
 
 fn bubbles_setup_system(
     mut commands: Commands,
     ratatui_render: Res<RatatuiRenderContext>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(Camera3dBundle {
-        camera: Camera {
-            target: ratatui_render.target("main").unwrap_or_default(),
+    let mut camera = Camera2dBundle::default();
+    camera.projection.scale = ORTHO_SCALING;
+    camera.camera.target = ratatui_render.target("main").unwrap_or_default();
+    commands.spawn(camera);
+
+    commands.spawn(PointLightBundle {
+        transform: Transform::from_xyz(0., 0., -5.),
+        point_light: PointLight {
+            intensity: 10_000.,
+            shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(0., 5., 0.).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::from_size(Vec3::splat(1.))),
-        material: materials.add(StandardMaterial::from_color(Color::hsl(180., 0.8, 0.5))),
-        ..default()
-    });
+    let rng = ChaCha8Rng::seed_from_u64(19878367467712);
+    commands.insert_resource(BubbleRng(rng));
+    commands.insert_resource(BubbleSprite(
+        asset_server.load("embedded://ttysvr/../assets/bubble.png"),
+    ));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bubbles_spawn_system(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut rng: ResMut<BubbleRng>,
+    sprite: Res<BubbleSprite>,
+    visible_region: Res<BubbleVisibleRegion>,
+    mut timer: Local<BubbleTimer>,
+    mut count: Local<u32>,
+) {
+    timer.tick(time.delta());
+    if timer.finished() && *count < BUBBLE_MAX_SPAWN {
+        *count += 1;
+        commands.spawn(BubbleBundle::new(
+            &mut rng,
+            &sprite,
+            &Rectangle::from_size(**visible_region - BUBBLE_RADIUS * 2.),
+        ));
+    }
+}
+
+fn handle_resize_system(
+    mut resize_events: EventReader<ResizeEvent>,
+    mut visible_region: ResMut<BubbleVisibleRegion>,
+    ratatui_render: Res<RatatuiRenderContext>,
+) {
+    for _ in resize_events.read() {
+        let (width, height) = ratatui_render.dimensions("main").unwrap();
+        let terminal_dimensions = Vec2::new(width as f32, height as f32);
+        **visible_region = terminal_dimensions * ORTHO_SCALING;
+    }
+}
+
+fn bubble_movement_system(
+    mut bubbles: Query<(&mut Transform, &mut LinearVelocity), With<Bubble>>,
+    visible_region: Res<BubbleVisibleRegion>,
+) {
+    for (mut transform, mut velocity) in &mut bubbles {
+        **velocity += (rand::random::<Vec2>() - 0.5) * 8.;
+        **velocity = velocity.clamp(
+            -Vec2::splat(BUBBLE_MAX_SPEED),
+            Vec2::splat(BUBBLE_MAX_SPEED),
+        );
+
+        let visible_half = Rectangle::from_size(**visible_region - BUBBLE_RADIUS * 1.95)
+            .half_size
+            .extend(0.);
+
+        transform.translation = transform.translation.clamp(-visible_half, visible_half);
+    }
 }

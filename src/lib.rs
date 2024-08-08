@@ -4,8 +4,8 @@ use bevy::{app::ScheduleRunnerPlugin, log::LogPlugin, prelude::*, window::ExitCo
 use bevy_ratatui::RatatuiPlugins;
 use bevy_ratatui_render::RatatuiRenderPlugin;
 use rand::{distributions::Standard, prelude::Distribution, Rng};
-use ratatui::crossterm::terminal;
 
+mod assets;
 mod bubbles;
 mod common;
 mod maze;
@@ -26,18 +26,12 @@ impl Plugin for AppPlugin {
                 .disable::<LogPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
+            RatatuiRenderPlugin::new("main", (1, 1)).autoresize(),
         ))
         .insert_resource(Msaa::Off)
         .init_resource::<Flags>();
 
-        let (cols, rows) = terminal::size().expect("Failed to retrieve terminal dimensions.");
-
-        app.add_plugins(RatatuiRenderPlugin::new(
-            "main",
-            (cols as u32, rows as u32 * 2),
-        ));
-
-        app.add_plugins(common::plugin);
+        app.add_plugins((assets::plugin, common::plugin));
 
         app.add_plugins(match self.0 {
             SaverVariant::Maze => maze::plugin,
@@ -50,6 +44,7 @@ impl Plugin for AppPlugin {
 #[derive(Resource, Default)]
 pub struct Flags {
     _debug: bool,
+    _msgs: Vec<String>,
 }
 
 pub enum SaverVariant {
