@@ -1,19 +1,19 @@
 use avian2d::{
     math::{Scalar, Vector},
-    prelude::{Collider, Gravity, LinearVelocity, LockedAxes, RigidBody},
+    prelude::{Collider, Friction, Gravity, LinearVelocity, LockedAxes, RigidBody},
     PhysicsPlugins,
 };
-use bevy::prelude::*;
+use bevy::{math::VectorSpace, prelude::*};
 use bevy_ratatui::event::ResizeEvent;
 use bevy_ratatui_render::RatatuiRenderContext;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 const ORTHO_SCALING: f32 = 0.5;
-const BUBBLE_RATE: f32 = 1.;
+const BUBBLE_RATE: f32 = 0.5;
 const BUBBLE_MAX_SPAWN: u32 = 16;
-const BUBBLE_MAX_SPEED: f32 = 45.;
-const BUBBLE_RADIUS: f32 = 10.;
+const BUBBLE_MAX_SPEED: f32 = 24.;
+const BUBBLE_RADIUS: f32 = 9.;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(128.))
@@ -26,12 +26,16 @@ pub(super) fn plugin(app: &mut App) {
                 bubbles_spawn_system,
                 handle_resize_system,
                 bubble_movement_system,
+                bubble_color_system,
             ),
         );
 }
 
 #[derive(Component)]
-pub struct Bubble;
+pub struct Bubble {
+    target: Vec2,
+    timer: Timer,
+}
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct BubbleRng(ChaCha8Rng);
@@ -49,12 +53,16 @@ pub struct BubbleBundle {
     rigidbody: RigidBody,
     collider: Collider,
     locked_axes: LockedAxes,
+    friction: Friction,
 }
 
 impl BubbleBundle {
     fn new(rng: &mut BubbleRng, sprite: &BubbleSprite, region: &Rectangle) -> Self {
         Self {
-            bubble: Bubble,
+            bubble: Bubble {
+                target: region.sample_interior(&mut rng.0),
+                timer: Timer::from_seconds(3., TimerMode::Repeating),
+            },
             sprite: SpriteBundle {
                 transform: Transform::from_translation(
                     region.sample_interior(&mut rng.0).extend(0.),
@@ -70,6 +78,7 @@ impl BubbleBundle {
             rigidbody: RigidBody::Dynamic,
             collider: Collider::circle(BUBBLE_RADIUS as Scalar),
             locked_axes: LockedAxes::ROTATION_LOCKED,
+            friction: Friction::new(0.0),
         }
     }
 }
@@ -144,20 +153,41 @@ fn handle_resize_system(
 }
 
 fn bubble_movement_system(
-    mut bubbles: Query<(&mut Transform, &mut LinearVelocity), With<Bubble>>,
+    time: Res<Time>,
+    mut bubbles: Query<(&mut Transform, &mut LinearVelocity, &mut Bubble)>,
     visible_region: Res<BubbleVisibleRegion>,
+    mut rng: ResMut<BubbleRng>,
 ) {
-    for (mut transform, mut velocity) in &mut bubbles {
-        **velocity += (rand::random::<Vec2>() - 0.5) * 8.;
+    for (mut transform, mut velocity, mut bubble) in &mut bubbles {
+        let visible_area = Rectangle::from_size(**visible_region - BUBBLE_RADIUS * 1.95);
+        let visible_half = visible_area.half_size.extend(0.);
+
+        let diff = (bubble.target.extend(0.) - transform.translation).xy();
+
+        let next_point = visible_area.sample_interior(&mut rng.0);
+
+        bubble.timer.tick(time.delta());
+        if diff.length() < 30.0 || bubble.timer.finished() {
+            bubble.target = next_point * 2.;
+            bubble.timer.reset();
+        }
+
+        bubble.target = bubble
+            .target
+            .move_towards(next_point, time.delta_seconds() * 10.);
+
+        **velocity += diff * 0.01;
         **velocity = velocity.clamp(
             -Vec2::splat(BUBBLE_MAX_SPEED),
             Vec2::splat(BUBBLE_MAX_SPEED),
         );
-
-        let visible_half = Rectangle::from_size(**visible_region - BUBBLE_RADIUS * 1.95)
-            .half_size
-            .extend(0.);
-
         transform.translation = transform.translation.clamp(-visible_half, visible_half);
+    }
+}
+
+fn bubble_color_system(time: Res<Time>, mut bubbles: Query<&mut Sprite, With<Bubble>>) {
+    for mut sprite in &mut bubbles {
+        let new_hue = (sprite.color.hue() + time.delta_seconds() * 10.) % 360.;
+        sprite.color.set_hue(new_hue);
     }
 }
