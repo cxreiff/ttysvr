@@ -3,15 +3,14 @@ use avian2d::{
     prelude::{Collider, Friction, Gravity, LinearVelocity, LockedAxes, RigidBody},
     PhysicsPlugins,
 };
-use bevy::{math::VectorSpace, prelude::*};
+use bevy::prelude::*;
 use bevy_ratatui::event::ResizeEvent;
 use bevy_ratatui_render::RatatuiRenderContext;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 const ORTHO_SCALING: f32 = 0.5;
-const BUBBLE_RATE: f32 = 0.5;
-const BUBBLE_MAX_SPAWN: u32 = 16;
+const BUBBLE_RATE: f32 = 0.33;
 const BUBBLE_MAX_SPEED: f32 = 24.;
 const BUBBLE_RADIUS: f32 = 9.;
 
@@ -19,6 +18,7 @@ pub(super) fn plugin(app: &mut App) {
     app.add_plugins(PhysicsPlugins::default().with_length_unit(128.))
         .insert_resource(Gravity(Vector::ZERO))
         .init_resource::<BubbleVisibleRegion>()
+        .init_resource::<BubbleAmount>()
         .add_systems(Startup, bubbles_setup_system)
         .add_systems(
             Update,
@@ -39,6 +39,9 @@ pub struct Bubble {
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct BubbleRng(ChaCha8Rng);
+
+#[derive(Resource, Default, Deref, DerefMut)]
+pub struct BubbleAmount(u32);
 
 #[derive(Resource, Deref)]
 pub struct BubbleSprite(Handle<Image>);
@@ -126,11 +129,12 @@ fn bubbles_spawn_system(
     mut rng: ResMut<BubbleRng>,
     sprite: Res<BubbleSprite>,
     visible_region: Res<BubbleVisibleRegion>,
+    spawn_amount: ResMut<BubbleAmount>,
     mut timer: Local<BubbleTimer>,
     mut count: Local<u32>,
 ) {
     timer.tick(time.delta());
-    if timer.finished() && *count < BUBBLE_MAX_SPAWN {
+    if timer.finished() && *count < **spawn_amount {
         *count += 1;
         commands.spawn(BubbleBundle::new(
             &mut rng,
@@ -143,12 +147,14 @@ fn bubbles_spawn_system(
 fn handle_resize_system(
     mut resize_events: EventReader<ResizeEvent>,
     mut visible_region: ResMut<BubbleVisibleRegion>,
+    mut spawn_amount: ResMut<BubbleAmount>,
     ratatui_render: Res<RatatuiRenderContext>,
 ) {
     for _ in resize_events.read() {
         let (width, height) = ratatui_render.dimensions("main").unwrap();
         let terminal_dimensions = Vec2::new(width as f32, height as f32);
         **visible_region = terminal_dimensions * ORTHO_SCALING;
+        **spawn_amount = ((visible_region.x * visible_region.y) / 777.) as u32;
     }
 }
 
