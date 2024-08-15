@@ -7,6 +7,8 @@ bevy plugin that allows you to render a bevy application to the terminal using
 [ratatui](https://github.com/ratatui-org/ratatui) and
 [ratatui-image](https://github.com/benjajaja/ratatui-image).
 
+Triggering immediately works in any shell, triggering after a delay is currently Zsh only.
+
 ## installation
 
 ```sh
