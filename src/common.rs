@@ -27,7 +27,7 @@ fn draw_scene_system(
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
         if let Some(widget) = ratatui_render.widget("main") {
-            frame.render_widget(widget, frame.size());
+            frame.render_widget(widget, frame.area());
 
             // frame.render_widget(
             //     Paragraph::new(flags.msgs.join("\n")).fg(Color::DarkRed),
