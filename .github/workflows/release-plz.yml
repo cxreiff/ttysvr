@@ -1,0 +1,22 @@
+name: release_plz
+
+permissions:
+  pull-requests: write
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: cxreiff/github_workflows/.github/workflows/rust_release.yml@main
+    permissions:
+      pull-requests: write
+      contents: write
+    secrets:
+      RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    with:
+      linux_dependencies: libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
