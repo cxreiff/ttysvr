@@ -1,0 +1,13 @@
+name: checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check:
+    permissions:
+      checks: write
+    uses: cxreiff/github_workflows/.github/workflows/rust_checks.yml@main
