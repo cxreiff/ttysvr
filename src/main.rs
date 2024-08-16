@@ -2,7 +2,7 @@ use std::{env, fmt::Display};
 
 use bevy::app::App;
 use clap::{Parser, Subcommand};
-use ttysvr::{AppPlugin, SaverVariant};
+use ttysvr::{AppPlugin, SaverVariant, LOGO_PATH_DVD, LOGO_PATH_TTY};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -31,17 +31,41 @@ struct Cli {
 
 #[derive(Subcommand)]
 pub enum Variant {
-    Maze,
-    Pipes,
     Bubbles,
+    Logo {
+        #[command(subcommand)]
+        variant: Option<LogoVariant>,
+    },
+    Maze,
+}
+
+#[derive(Subcommand)]
+pub enum LogoVariant {
+    Dvd,
+    Tty,
 }
 
 impl Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Variant::Maze => write!(f, "maze"),
-            Variant::Pipes => write!(f, "pipes"),
             Variant::Bubbles => write!(f, "bubbles"),
+            Variant::Logo { variant } => {
+                if let Some(variant) = variant {
+                    write!(f, "logo {}", variant)
+                } else {
+                    write!(f, "logo")
+                }
+            }
+            Variant::Maze => write!(f, "maze"),
+        }
+    }
+}
+
+impl Display for LogoVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogoVariant::Dvd => write!(f, "dvd"),
+            LogoVariant::Tty => write!(f, "tty"),
         }
     }
 }
@@ -54,9 +78,13 @@ fn main() {
     } = Cli::parse();
 
     let saver_variant = match variant {
-        Some(Variant::Maze) => SaverVariant::Maze,
-        Some(Variant::Pipes) => SaverVariant::Pipes,
         Some(Variant::Bubbles) => SaverVariant::Bubbles,
+        Some(Variant::Logo { ref variant }) => match variant {
+            Some(LogoVariant::Dvd) => SaverVariant::Logo(LOGO_PATH_DVD.into()),
+            Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
+            None => SaverVariant::Logo(LOGO_PATH_TTY.into()),
+        },
+        Some(Variant::Maze) => SaverVariant::Maze,
         None => rand::random(),
     };
 

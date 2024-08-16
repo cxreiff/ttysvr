@@ -105,16 +105,6 @@ fn bubbles_setup_system(
     camera.camera.target = ratatui_render.target("main").unwrap_or_default();
     commands.spawn(camera);
 
-    commands.spawn(PointLightBundle {
-        transform: Transform::from_xyz(0., 0., -5.),
-        point_light: PointLight {
-            intensity: 10_000.,
-            shadows_enabled: true,
-            ..default()
-        },
-        ..default()
-    });
-
     let rng = ChaCha8Rng::seed_from_u64(19878367467712);
     commands.insert_resource(BubbleRng(rng));
     commands.insert_resource(BubbleSprite(
