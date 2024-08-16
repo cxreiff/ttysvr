@@ -12,7 +12,12 @@ Triggering immediately works in any shell, triggering after a delay is currently
 ## installation
 
 ```sh
-cargo install --locked ttysvr`
+# cargo
+cargo install --locked ttysvr
+```
+```sh
+# homebrew
+brew install cxreiff/tap/ttysvr
 ```
 
 ## usage
@@ -20,6 +25,12 @@ cargo install --locked ttysvr`
 Starts the screensaver immediately. If no variant is specified, one is randomly selected.
 ```sh
 ttysvr [VARIANT]
+```
+
+Some variants have subvariants.
+
+```sh
+ttysvr [VARIANT] [SUBVARIANT]
 ```
 
 Sets up the screensaver to activate after `DELAY` seconds of inactivity in your current shell session.
@@ -41,11 +52,11 @@ eval `ttysvr --cancel`
 
 ## variants
 
-|         |                     |
-|---------|---------------------|
-| maze    | not yet implemented |
-| pipes   | not yet implemented |
-| bubbles | not yet implemented |
+| variant | subvariants? | description                                |
+|---------|--------------|--------------------------------------------|
+| bubbles |              | Colorful bubbles bounce around the screen. |
+| logo    | `dvd`, `tty` | DVD player style bouncing logo.            |
+| maze    |              | Not yet implemented.                       |
 
 ## compatibility
 
