@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/cxreiff/ttysvr/compare/v0.2.0...v0.2.1) - 2024-08-17
+
+### Other
+- temporary allow dirty in cargo dist
+- testing cargo-dist PR manually
+
 ## [0.2.0](https://github.com/cxreiff/ttysvr/compare/v0.1.4...v0.2.0) - 2024-08-16
 
 ### Other
