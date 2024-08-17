@@ -21,6 +21,16 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 ratatui = "0.28.0"
 
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
@@ -42,6 +52,8 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-
 publish-jobs = ["homebrew"]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
+# TEMP FOR CARGO-DIST PR
+allow-dirty = ["ci", "msi"]
 
 [workspace.metadata.dist.dependencies.apt]
 libasound2-dev = "*"
