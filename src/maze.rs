@@ -15,7 +15,10 @@ enum MazeDirection {
 
 type MazeGraph = BTreeMap<(i32, i32), (bool, bool, bool, bool)>;
 
-const MAZE_SIZE: i32 = 16;
+const MAZE_SIZE: i32 = 12;
+const MAZE_SCALE: f32 = 1.;
+const MAZE_SPEED: f32 = 1.5;
+const WALL_DIMENSIONS: Vec3 = Vec3::new(1.0, 0.01, 1.0);
 const DIRECTION_LIST: &[MazeDirection] = &[
     MazeDirection::North,
     MazeDirection::East,
@@ -24,8 +27,14 @@ const DIRECTION_LIST: &[MazeDirection] = &[
 ];
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, (maze_generation_system, maze_setup_system).chain())
-        .add_systems(Update, movement_system);
+    app.add_systems(
+        Startup,
+        (
+            (maze_generation_system, maze_setup_system).chain(),
+            lighting_setup_system,
+        ),
+    )
+    .add_systems(Update, movement_system);
 }
 
 #[derive(Resource, Deref)]
@@ -33,6 +42,10 @@ struct Maze(MazeGraph);
 
 #[derive(Resource, Deref, DerefMut)]
 struct MazeTarget((i32, i32));
+
+fn lighting_setup_system(mut ambient: ResMut<AmbientLight>) {
+    ambient.brightness = 2000.0;
+}
 
 fn maze_generation_system(mut commands: Commands) {
     let mut maze: MazeGraph = BTreeMap::new();
@@ -91,60 +104,101 @@ fn maze_setup_system(
     mut commands: Commands,
     ratatui_render: Res<RatatuiRenderContext>,
     maze: Res<Maze>,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh = meshes.add(Cuboid::from_size(Vec3::new(1.0, 0.1, 1.0)));
-    let material = materials.add(StandardMaterial::from_color(Color::hsl(0., 0.5, 0.5)));
+    let wall_mesh = meshes.add(Cuboid::from_size(Vec3::new(
+        WALL_DIMENSIONS.x * MAZE_SCALE,
+        WALL_DIMENSIONS.y * MAZE_SCALE,
+        WALL_DIMENSIONS.z * MAZE_SCALE,
+    )));
+
+    let floor_ceiling_mesh = meshes.add(Cuboid::from_size(Vec3::new(MAZE_SCALE, MAZE_SCALE, 0.01)));
+
+    let wall_material = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("embedded://ttysvr/../assets/maze_wall.png")),
+        reflectance: 0.0,
+        ..default()
+    });
+
+    let floor_material = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("embedded://ttysvr/../assets/maze_floor.png")),
+        reflectance: 0.0,
+        ..default()
+    });
+
+    let ceiling_material = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("embedded://ttysvr/../assets/maze_ceiling.png")),
+        reflectance: 0.0,
+        ..default()
+    });
 
     for ((x, y), (north, east, south, west)) in maze.iter() {
-        let translation = Vec3::new(*x as f32, *y as f32, -0.75);
+        let translation = target_to_vec3((*x, *y));
 
         if !*north {
-            let transform = Transform::default().with_translation(translation + Vec3::Y / 2.);
+            let transform =
+                Transform::default().with_translation(translation + Vec3::Y * MAZE_SCALE * 0.5);
             commands.spawn(PbrBundle {
                 transform,
-                mesh: mesh.clone(),
-                material: material.clone(),
+                mesh: wall_mesh.clone(),
+                material: wall_material.clone(),
                 ..default()
             });
         }
 
         if !*east {
             let transform = Transform::default()
-                .with_translation(translation + Vec3::X / 2.)
+                .with_translation(translation + Vec3::X * MAZE_SCALE * 0.5)
                 .with_rotation(Quat::from_rotation_z(PI / 2.));
             commands.spawn(PbrBundle {
                 transform,
-                mesh: mesh.clone(),
-                material: material.clone(),
+                mesh: wall_mesh.clone(),
+                material: wall_material.clone(),
                 ..default()
             });
         }
 
-        if !*south {
+        if !*south && *y == 0 {
             let transform = Transform::default()
-                .with_translation(translation - Vec3::Y / 2.)
+                .with_translation(translation - Vec3::Y * MAZE_SCALE * 0.5)
                 .with_rotation(Quat::from_rotation_z(PI));
             commands.spawn(PbrBundle {
                 transform,
-                mesh: mesh.clone(),
-                material: material.clone(),
+                mesh: wall_mesh.clone(),
+                material: wall_material.clone(),
                 ..default()
             });
         }
 
-        if !*west {
+        if !*west && *x == 0 {
             let transform = Transform::default()
-                .with_translation(translation - Vec3::X / 2.)
+                .with_translation(translation - Vec3::X * MAZE_SCALE * 0.5)
                 .with_rotation(Quat::from_rotation_z(PI * 3. / 2.));
             commands.spawn(PbrBundle {
                 transform,
-                mesh: mesh.clone(),
-                material: material.clone(),
+                mesh: wall_mesh.clone(),
+                material: wall_material.clone(),
                 ..default()
             });
         }
+
+        commands.spawn(PbrBundle {
+            transform: Transform::default()
+                .with_translation(translation - Vec3::Z * 0.5 * MAZE_SCALE * WALL_DIMENSIONS.z),
+            mesh: floor_ceiling_mesh.clone(),
+            material: floor_material.clone(),
+            ..default()
+        });
+
+        commands.spawn(PbrBundle {
+            transform: Transform::default()
+                .with_translation(translation + Vec3::Z * 0.5 * MAZE_SCALE * WALL_DIMENSIONS.z),
+            mesh: floor_ceiling_mesh.clone(),
+            material: ceiling_material.clone(),
+            ..default()
+        });
     }
 
     commands
@@ -153,6 +207,10 @@ fn maze_setup_system(
                 target: ratatui_render.target("main").unwrap_or_default(),
                 ..default()
             },
+            projection: Projection::Perspective(PerspectiveProjection {
+                fov: PI / 2.,
+                ..default()
+            }),
             transform: Transform::from_translation(Vec3::new(0., 0., 0.))
                 .looking_at(Vec3::new(0., 1., 0.), Vec3::Z),
             ..default()
@@ -160,7 +218,7 @@ fn maze_setup_system(
         .with_children(|commands| {
             commands.spawn(PointLightBundle {
                 point_light: PointLight {
-                    intensity: 100_000.,
+                    intensity: 10_000.,
                     ..default()
                 },
                 ..default()
@@ -174,7 +232,7 @@ fn movement_system(
     mut target: ResMut<MazeTarget>,
     mut camera: Query<&mut Transform, With<Camera>>,
 ) {
-    let delta = time.delta_seconds();
+    let delta = time.delta_seconds() * MAZE_SPEED;
     let mut camera_transform = camera.single_mut();
     let target_vec = target_to_vec3(**target);
 
@@ -183,24 +241,24 @@ fn movement_system(
         .dot((target_vec - camera_transform.translation).normalize());
 
     if (camera_target_dot - 1.).abs() < 0.0001 {
-        camera_transform.translation = camera_transform.translation.move_towards(target_vec, delta);
+        camera_transform.look_at(target_vec, Vec3::Z);
+        camera_transform.translation = camera_transform
+            .translation
+            .move_towards(target_vec, delta * MAZE_SCALE);
+    } else if camera_target_cross_dot(target_vec, &camera_transform) > 0. {
+        camera_transform.rotate_z(-delta);
+        if camera_target_cross_dot(target_vec, &camera_transform) < 0. {
+            camera_transform.look_at(target_vec, Vec3::Z);
+        }
     } else {
-        let target_dir = target_vec - camera_transform.translation;
-        let cross = target_dir.cross(*camera_transform.forward());
-        let dot = cross.dot(Vec3::Z);
-
-        if dot > 0. {
-            camera_transform.rotate_z(-delta);
-        } else {
-            camera_transform.rotate_z(delta);
+        camera_transform.rotate_z(delta);
+        if camera_target_cross_dot(target_vec, &camera_transform) > 0. {
+            camera_transform.look_at(target_vec, Vec3::Z);
         }
     }
 
-    if camera_transform
-        .translation
-        .distance(target_to_vec3(**target))
-        < 0.01
-    {
+    if camera_transform.translation.distance(target_vec) < 0.01 {
+        camera_transform.translation = target_vec;
         let node_edges = maze.get(&target).unwrap();
         let facing_direction = camera_direction(&camera_transform);
         let next_direction = next_valid_direction(&facing_direction, node_edges);
@@ -263,5 +321,15 @@ fn next_valid_direction(
 }
 
 fn target_to_vec3(target: (i32, i32)) -> Vec3 {
-    Vec3::new((target).0 as f32, target.1 as f32, 0.)
+    Vec3::new(
+        (target).0 as f32 * MAZE_SCALE,
+        target.1 as f32 * MAZE_SCALE,
+        0.,
+    )
+}
+
+fn camera_target_cross_dot(target_vec: Vec3, camera_transform: &Transform) -> f32 {
+    let target_dir = target_vec - camera_transform.translation;
+    let cross = target_dir.cross(*camera_transform.forward());
+    cross.dot(Vec3::Z)
 }

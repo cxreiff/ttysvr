@@ -56,7 +56,7 @@ eval `ttysvr --cancel`
 |---------|--------------|--------------------------------------------|
 | bubbles |              | Colorful bubbles bounce around the screen. |
 | logo    | `dvd`, `tty` | DVD player style bouncing logo.            |
-| maze    |              | Not yet implemented.                       |
+| maze    |              | 3D randomly generated maze.                |
 
 ## compatibility
 
