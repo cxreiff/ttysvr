@@ -5,7 +5,8 @@ use bevy::prelude::*;
 use bevy_ratatui_render::RatatuiRenderContext;
 use rand::{seq::SliceRandom, thread_rng};
 
-enum EdgeDirection {
+#[derive(PartialEq, Debug)]
+enum MazeDirection {
     North,
     East,
     South,
@@ -15,11 +16,11 @@ enum EdgeDirection {
 type MazeGraph = BTreeMap<(i32, i32), (bool, bool, bool, bool)>;
 
 const MAZE_SIZE: i32 = 16;
-const DIRECTION_LIST: &[EdgeDirection] = &[
-    EdgeDirection::North,
-    EdgeDirection::East,
-    EdgeDirection::South,
-    EdgeDirection::West,
+const DIRECTION_LIST: &[MazeDirection] = &[
+    MazeDirection::North,
+    MazeDirection::East,
+    MazeDirection::South,
+    MazeDirection::West,
 ];
 
 pub(super) fn plugin(app: &mut App) {
@@ -43,7 +44,7 @@ fn maze_generation_system(mut commands: Commands) {
             break;
         };
 
-        let valid_candidates: Vec<&EdgeDirection> = DIRECTION_LIST
+        let valid_candidates: Vec<&MazeDirection> = DIRECTION_LIST
             .iter()
             .filter(|direction| {
                 let candidate = adjacent_node(current, direction);
@@ -60,19 +61,19 @@ fn maze_generation_system(mut commands: Commands) {
         let next = adjacent_node(current, next_direction);
 
         match next_direction {
-            EdgeDirection::North => {
+            MazeDirection::North => {
                 maze.entry(current).or_default().0 = true;
                 maze.entry(next).or_default().2 = true;
             }
-            EdgeDirection::East => {
+            MazeDirection::East => {
                 maze.entry(current).or_default().1 = true;
                 maze.entry(next).or_default().3 = true;
             }
-            EdgeDirection::South => {
+            MazeDirection::South => {
                 maze.entry(current).or_default().2 = true;
                 maze.entry(next).or_default().0 = true;
             }
-            EdgeDirection::West => {
+            MazeDirection::West => {
                 maze.entry(current).or_default().3 = true;
                 maze.entry(next).or_default().1 = true;
             }
@@ -97,7 +98,7 @@ fn maze_setup_system(
     let material = materials.add(StandardMaterial::from_color(Color::hsl(0., 0.5, 0.5)));
 
     for ((x, y), (north, east, south, west)) in maze.iter() {
-        let translation = Vec3::new(*x as f32, *y as f32, 0.);
+        let translation = Vec3::new(*x as f32, *y as f32, -0.75);
 
         if !*north {
             let transform = Transform::default().with_translation(translation + Vec3::Y / 2.);
@@ -174,45 +175,93 @@ fn movement_system(
     mut camera: Query<&mut Transform, With<Camera>>,
 ) {
     let delta = time.delta_seconds();
-    let mut camera = camera.single_mut();
-    let target_vec = Vec3::new((**target).0 as f32, target.1 as f32, 0.);
+    let mut camera_transform = camera.single_mut();
+    let target_vec = target_to_vec3(**target);
 
-    if camera.translation.distance(target_vec) < 0.01 {
-        let (north, east, south, west) = maze.get(&target).unwrap();
+    let camera_target_dot = camera_transform
+        .forward()
+        .dot((target_vec - camera_transform.translation).normalize());
 
-        let _view_direction = rotation_to_edge_direction(camera.rotation);
-
-        if *north {
-            **target = adjacent_node(**target, &EdgeDirection::North)
-        } else if *east {
-            **target = adjacent_node(**target, &EdgeDirection::East)
-        } else if *south {
-            **target = adjacent_node(**target, &EdgeDirection::South)
-        } else if *west {
-            **target = adjacent_node(**target, &EdgeDirection::West)
-        }
-    };
-
-    camera.translation = camera.translation.move_towards(target_vec, delta);
-}
-
-fn adjacent_node((x, y): (i32, i32), direction: &EdgeDirection) -> (i32, i32) {
-    match direction {
-        EdgeDirection::North => (x, y + 1),
-        EdgeDirection::East => (x + 1, y),
-        EdgeDirection::South => (x, y - 1),
-        EdgeDirection::West => (x - 1, y),
-    }
-}
-
-fn rotation_to_edge_direction(rotation: Quat) -> EdgeDirection {
-    if (0.0..(PI / 2.)).contains(&rotation.z) {
-        EdgeDirection::North
-    } else if ((PI / 2.)..PI).contains(&rotation.z) {
-        EdgeDirection::East
-    } else if (PI..(PI * 3. / 2.)).contains(&rotation.z) {
-        EdgeDirection::South
+    if (camera_target_dot - 1.).abs() < 0.0001 {
+        camera_transform.translation = camera_transform.translation.move_towards(target_vec, delta);
     } else {
-        EdgeDirection::West
+        let target_dir = target_vec - camera_transform.translation;
+        let cross = target_dir.cross(*camera_transform.forward());
+        let dot = cross.dot(Vec3::Z);
+
+        if dot > 0. {
+            camera_transform.rotate_z(-delta);
+        } else {
+            camera_transform.rotate_z(delta);
+        }
     }
+
+    if camera_transform
+        .translation
+        .distance(target_to_vec3(**target))
+        < 0.01
+    {
+        let node_edges = maze.get(&target).unwrap();
+        let facing_direction = camera_direction(&camera_transform);
+        let next_direction = next_valid_direction(&facing_direction, node_edges);
+        **target = adjacent_node(**target, &next_direction);
+    };
+}
+
+fn adjacent_node((x, y): (i32, i32), direction: &MazeDirection) -> (i32, i32) {
+    match direction {
+        MazeDirection::North => (x, y + 1),
+        MazeDirection::East => (x + 1, y),
+        MazeDirection::South => (x, y - 1),
+        MazeDirection::West => (x - 1, y),
+    }
+}
+
+fn camera_direction(camera_transform: &Transform) -> MazeDirection {
+    let forward_vector = camera_transform.forward();
+
+    if forward_vector.x.abs() > forward_vector.y.abs() {
+        if forward_vector.x < 0. {
+            MazeDirection::West
+        } else {
+            MazeDirection::East
+        }
+    } else if forward_vector.y < 0. {
+        MazeDirection::South
+    } else {
+        MazeDirection::North
+    }
+}
+
+fn next_valid_direction(
+    facing: &MazeDirection,
+    (north, east, south, west): &(bool, bool, bool, bool),
+) -> MazeDirection {
+    let mut direction_order = vec![
+        MazeDirection::North,
+        MazeDirection::East,
+        MazeDirection::South,
+        MazeDirection::West,
+    ];
+
+    while *facing != direction_order[1] {
+        direction_order.rotate_left(1);
+    }
+
+    for direction in direction_order {
+        if match direction {
+            MazeDirection::North => *north,
+            MazeDirection::East => *east,
+            MazeDirection::South => *south,
+            MazeDirection::West => *west,
+        } {
+            return direction;
+        }
+    }
+
+    unreachable!();
+}
+
+fn target_to_vec3(target: (i32, i32)) -> Vec3 {
+    Vec3::new((target).0 as f32, target.1 as f32, 0.)
 }

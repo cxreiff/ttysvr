@@ -30,7 +30,7 @@ fn draw_scene_system(
             frame.render_widget(widget, frame.area());
 
             // frame.render_widget(
-            //     Paragraph::new(flags.msgs.join("\n")).fg(Color::DarkRed),
+            //     Paragraph::new(flags.msgs.join("\n")).fg(Color::DarkBlue),
             //     ratatui::layout::Rect {
             //         x: 1,
             //         y: 1,
