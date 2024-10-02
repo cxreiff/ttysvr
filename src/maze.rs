@@ -16,8 +16,9 @@ enum MazeDirection {
 type MazeGraph = BTreeMap<(i32, i32), (bool, bool, bool, bool)>;
 
 const MAZE_SIZE: i32 = 12;
-const MAZE_SCALE: f32 = 1.;
-const MAZE_SPEED: f32 = 1.5;
+const MAZE_SCALE: f32 = 1.0;
+const MAZE_WALK_SPEED: f32 = 1.5;
+const MAZE_TURN_SPEED: f32 = 2.5;
 const WALL_DIMENSIONS: Vec3 = Vec3::new(1.0, 0.01, 1.0);
 const DIRECTION_LIST: &[MazeDirection] = &[
     MazeDirection::North,
@@ -232,7 +233,7 @@ fn movement_system(
     mut target: ResMut<MazeTarget>,
     mut camera: Query<&mut Transform, With<Camera>>,
 ) {
-    let delta = time.delta_seconds() * MAZE_SPEED;
+    let delta = time.delta_seconds();
     let mut camera_transform = camera.single_mut();
     let target_vec = target_to_vec3(**target);
 
@@ -244,14 +245,14 @@ fn movement_system(
         camera_transform.look_at(target_vec, Vec3::Z);
         camera_transform.translation = camera_transform
             .translation
-            .move_towards(target_vec, delta * MAZE_SCALE);
+            .move_towards(target_vec, delta * MAZE_SCALE * MAZE_WALK_SPEED);
     } else if camera_target_cross_dot(target_vec, &camera_transform) > 0. {
-        camera_transform.rotate_z(-delta);
+        camera_transform.rotate_z(-delta * MAZE_TURN_SPEED);
         if camera_target_cross_dot(target_vec, &camera_transform) < 0. {
             camera_transform.look_at(target_vec, Vec3::Z);
         }
     } else {
-        camera_transform.rotate_z(delta);
+        camera_transform.rotate_z(delta * MAZE_TURN_SPEED);
         if camera_target_cross_dot(target_vec, &camera_transform) > 0. {
             camera_transform.look_at(target_vec, Vec3::Z);
         }

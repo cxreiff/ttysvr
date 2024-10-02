@@ -1,13 +1,15 @@
 # ttysvr
 
-Screensavers for your terminal.
+Screensavers for your terminal. Start immediately or after a period of inactivity within a shell.
+
+![cube example](https://assets.cxreiff.com/github/ttysvr_logo.gif)![foxes](https://assets.cxreiff.com/github/ttysvr_bubbles.gif)![sponza test scene](https://assets.cxreiff.com/github/ttysvr_maze.gif)
 
 Uses [bevy_ratatui_render](https://github.com/cxreiff/bevy_ratatui_render), my
 bevy plugin that allows you to render a bevy application to the terminal using
 [ratatui](https://github.com/ratatui-org/ratatui) and
 [ratatui-image](https://github.com/benjajaja/ratatui-image).
 
-Triggering immediately works in any shell, triggering after a delay is currently Zsh only.
+Triggering the screensaver immediately works in any shell, triggering after a set period of inactivity is currently Zsh only.
 
 ## installation
 
