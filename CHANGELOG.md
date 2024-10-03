@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/cxreiff/ttysvr/compare/v0.2.1...v0.2.2) - 2024-10-03
+
+### Added
+
+- three screensavers and presentable readme
+
+### Other
+
+- example gifs
+- working maze screensaver
+- maze movement system
+- added maze generation
+- updated cargo-dist after homebrew contrib
+
 ## [0.2.1](https://github.com/cxreiff/ttysvr/compare/v0.2.0...v0.2.1) - 2024-08-17
 
 ### Other
