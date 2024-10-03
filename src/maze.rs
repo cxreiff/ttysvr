@@ -5,6 +5,11 @@ use bevy::prelude::*;
 use bevy_ratatui_render::RatatuiRenderContext;
 use rand::{seq::SliceRandom, thread_rng};
 
+pub const MAZE_WALL_PATH_BRICK: &str = "embedded://ttysvr/../assets/maze_wall_brick.png";
+pub const MAZE_WALL_PATH_HEDGE: &str = "embedded://ttysvr/../assets/maze_wall_hedge.png";
+pub const MAZE_CEILING_PATH_BRICK: &str = "embedded://ttysvr/../assets/maze_ceiling_brick.png";
+pub const MAZE_CEILING_PATH_HEDGE: &str = "embedded://ttysvr/../assets/maze_ceiling_hedge.png";
+
 #[derive(PartialEq, Debug)]
 enum MazeDirection {
     North,
@@ -37,6 +42,9 @@ pub(super) fn plugin(app: &mut App) {
     )
     .add_systems(Update, movement_system);
 }
+
+#[derive(Resource)]
+pub struct MazePaths(pub String, pub String);
 
 #[derive(Resource, Deref)]
 struct Maze(MazeGraph);
@@ -108,7 +116,10 @@ fn maze_setup_system(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    paths: Res<MazePaths>,
 ) {
+    let MazePaths(ref wall_path, ref ceiling_path) = *paths;
+
     let wall_mesh = meshes.add(Cuboid::from_size(Vec3::new(
         WALL_DIMENSIONS.x * MAZE_SCALE,
         WALL_DIMENSIONS.y * MAZE_SCALE,
@@ -118,7 +129,7 @@ fn maze_setup_system(
     let floor_ceiling_mesh = meshes.add(Cuboid::from_size(Vec3::new(MAZE_SCALE, MAZE_SCALE, 0.01)));
 
     let wall_material = materials.add(StandardMaterial {
-        base_color_texture: Some(asset_server.load("embedded://ttysvr/../assets/maze_wall.png")),
+        base_color_texture: Some(asset_server.load(wall_path)),
         reflectance: 0.0,
         ..default()
     });
@@ -130,7 +141,7 @@ fn maze_setup_system(
     });
 
     let ceiling_material = materials.add(StandardMaterial {
-        base_color_texture: Some(asset_server.load("embedded://ttysvr/../assets/maze_ceiling.png")),
+        base_color_texture: Some(asset_server.load(ceiling_path)),
         reflectance: 0.0,
         ..default()
     });

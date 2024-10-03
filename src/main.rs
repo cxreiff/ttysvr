@@ -2,7 +2,10 @@ use std::{env, fmt::Display};
 
 use bevy::app::App;
 use clap::{Parser, Subcommand};
-use ttysvr::{AppPlugin, SaverVariant, LOGO_PATH_DVD, LOGO_PATH_TTY};
+use ttysvr::{
+    AppPlugin, SaverVariant, LOGO_PATH_DVD, LOGO_PATH_TTY, MAZE_CEILING_PATH_BRICK,
+    MAZE_CEILING_PATH_HEDGE, MAZE_WALL_PATH_BRICK, MAZE_WALL_PATH_HEDGE,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -36,7 +39,10 @@ pub enum Variant {
         #[command(subcommand)]
         variant: Option<LogoVariant>,
     },
-    Maze,
+    Maze {
+        #[command(subcommand)]
+        variant: Option<MazeVariant>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -45,18 +51,30 @@ pub enum LogoVariant {
     Tty,
 }
 
+#[derive(Subcommand)]
+pub enum MazeVariant {
+    Brick,
+    Hedge,
+}
+
 impl Display for Variant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Variant::Bubbles => write!(f, "bubbles"),
             Variant::Logo { variant } => {
                 if let Some(variant) = variant {
-                    write!(f, "logo {}", variant)
+                    write!(f, "logo {variant}")
                 } else {
                     write!(f, "logo")
                 }
             }
-            Variant::Maze => write!(f, "maze"),
+            Variant::Maze { variant } => {
+                if let Some(variant) = variant {
+                    write!(f, "maze {variant}")
+                } else {
+                    write!(f, "maze")
+                }
+            }
         }
     }
 }
@@ -66,6 +84,15 @@ impl Display for LogoVariant {
         match self {
             LogoVariant::Dvd => write!(f, "dvd"),
             LogoVariant::Tty => write!(f, "tty"),
+        }
+    }
+}
+
+impl Display for MazeVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MazeVariant::Brick => write!(f, "brick"),
+            MazeVariant::Hedge => write!(f, "hedge"),
         }
     }
 }
@@ -80,11 +107,17 @@ fn main() {
     let saver_variant = match variant {
         Some(Variant::Bubbles) => SaverVariant::Bubbles,
         Some(Variant::Logo { ref variant }) => match variant {
-            Some(LogoVariant::Dvd) => SaverVariant::Logo(LOGO_PATH_DVD.into()),
+            Some(LogoVariant::Dvd) | None => SaverVariant::Logo(LOGO_PATH_DVD.into()),
             Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
-            None => SaverVariant::Logo(LOGO_PATH_TTY.into()),
         },
-        Some(Variant::Maze) => SaverVariant::Maze,
+        Some(Variant::Maze { ref variant }) => match variant {
+            Some(MazeVariant::Brick) | None => {
+                SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into())
+            }
+            Some(MazeVariant::Hedge) => {
+                SaverVariant::Maze(MAZE_WALL_PATH_HEDGE.into(), MAZE_CEILING_PATH_HEDGE.into())
+            }
+        },
         None => rand::random(),
     };
 

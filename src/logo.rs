@@ -18,7 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 #[derive(Component, Deref, DerefMut)]
-pub struct Logo {
+struct Logo {
     #[deref]
     velocity: Vec2,
 }
@@ -27,10 +27,10 @@ pub struct Logo {
 pub struct LogoPath(pub String);
 
 #[derive(Resource, Deref, DerefMut, Default)]
-pub struct LogoVisibleRegion(Vec2);
+struct LogoVisibleRegion(Vec2);
 
 #[derive(Bundle)]
-pub struct LogoBundle {
+struct LogoBundle {
     logo: Logo,
     sprite: SpriteBundle,
 }
