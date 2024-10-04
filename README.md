@@ -25,6 +25,10 @@ cargo install --locked ttysvr
 # homebrew
 brew install cxreiff/tap/ttysvr
 ```
+```sh
+# arch linux
+pacman -S ttysvr
+```
 
 ## usage
 
