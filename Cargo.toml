@@ -11,9 +11,14 @@ homepage = "https://github.com/cxreiff/ttysvr"
 categories = ["command-line-interface"]
 keywords = ["bevy", "ratatui", "terminal", "tui", "screensaver"]
 
+[features]
+defaults = ["wayland"]
+wayland = ["bevy/wayland", "winit/wayland"]
+
 [dependencies]
 avian2d = "0.1.1"
 bevy = "0.14.1"
+winit = "0.30.5"
 bevy_ratatui = "0.6.2"
 bevy_ratatui_render = "0.5.6"
 clap = { version = "4.5.13", features = ["derive"] }
