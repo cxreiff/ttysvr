@@ -1,10 +1,11 @@
 use std::{env, fmt::Display};
 
 use bevy::app::App;
+use bevy::color::Srgba;
 use clap::{Parser, Subcommand};
 use ttysvr::{
-    AppPlugin, SaverVariant, LOGO_PATH_DVD, LOGO_PATH_TTY, MAZE_CEILING_PATH_BRICK,
-    MAZE_CEILING_PATH_HEDGE, MAZE_WALL_PATH_BRICK, MAZE_WALL_PATH_HEDGE,
+    AppPlugin, CommonSettings, SaverVariant, Settings, LOGO_PATH_DVD, LOGO_PATH_TTY,
+    MAZE_CEILING_PATH_BRICK, MAZE_CEILING_PATH_HEDGE, MAZE_WALL_PATH_BRICK, MAZE_WALL_PATH_HEDGE,
 };
 
 #[derive(Parser)]
@@ -13,6 +14,9 @@ use ttysvr::{
 struct Cli {
     #[command(subcommand)]
     variant: Option<Variant>,
+
+    #[arg(long, help = "Changes the clear color to the given hex coded color.")]
+    background_color: Option<String>,
 
     #[arg(
         short,
@@ -102,23 +106,36 @@ fn main() {
         variant,
         init,
         cancel,
+        background_color,
     } = Cli::parse();
 
-    let saver_variant = match variant {
-        Some(Variant::Bubbles) => SaverVariant::Bubbles,
-        Some(Variant::Logo { ref variant }) => match variant {
-            Some(LogoVariant::Dvd) | None => SaverVariant::Logo(LOGO_PATH_DVD.into()),
-            Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
+    let mut settings = Settings {
+        saver: match variant {
+            Some(Variant::Bubbles) => SaverVariant::Bubbles,
+            Some(Variant::Logo { ref variant }) => match variant {
+                Some(LogoVariant::Dvd) | None => SaverVariant::Logo(LOGO_PATH_DVD.into()),
+                Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
+            },
+            Some(Variant::Maze { ref variant }) => match variant {
+                Some(MazeVariant::Brick) | None => {
+                    SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into())
+                }
+                Some(MazeVariant::Hedge) => {
+                    SaverVariant::Maze(MAZE_WALL_PATH_HEDGE.into(), MAZE_CEILING_PATH_HEDGE.into())
+                }
+            },
+            None => rand::random(),
         },
-        Some(Variant::Maze { ref variant }) => match variant {
-            Some(MazeVariant::Brick) | None => {
-                SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into())
+        common: {
+            let mut common_settings = CommonSettings::default();
+            if let Some(color) = background_color.as_deref().and_then(|c| Srgba::hex(c).ok()) {
+                common_settings.clear_color = color.into()
+            } else if background_color.is_some() {
+                println!("Invalid hex color")
             }
-            Some(MazeVariant::Hedge) => {
-                SaverVariant::Maze(MAZE_WALL_PATH_HEDGE.into(), MAZE_CEILING_PATH_HEDGE.into())
-            }
+
+            common_settings
         },
-        None => rand::random(),
     };
 
     if let Some(delay) = init {
@@ -153,5 +170,5 @@ TMOUT=0
         return;
     }
 
-    App::new().add_plugins(AppPlugin(saver_variant)).run();
+    App::new().add_plugins(AppPlugin(settings)).run();
 }
