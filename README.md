@@ -13,7 +13,8 @@ bevy plugin that allows you to render a bevy application to the terminal using
 [ratatui](https://github.com/ratatui-org/ratatui) and
 [ratatui-image](https://github.com/benjajaja/ratatui-image).
 
-Triggering the screensaver immediately works in any shell, triggering after a set period of inactivity is currently Zsh only.
+Triggering the screensaver immediately works in any shell, triggering after a set period of
+inactivity is currently Zsh only.
 
 ## installation
 
@@ -29,6 +30,12 @@ brew install cxreiff/tap/ttysvr
 # arch linux
 pacman -S ttysvr
 ```
+> [!IMPORTANT]
+> If you are on Linux and install using the cargo method, or otherwise build from source, you
+> will first need to refer to
+> [docs/linux_dependencies.md](https://github.com/bevyengine/bevy/blob/main/docs/linux_dependencies.md)
+> in the bevy repo for your distro's instructions on making sure bevy's required linux dependencies
+> are installed.
 
 ## usage
 
@@ -53,7 +60,7 @@ Cancels the screensaver in your current shell session.
 eval `ttysvr --cancel`
 ```
 
-> [!IMPORTANT]
+> [!NOTE]
 > Note that the `--init` and `--cancel` options require being wrapped in `eval` and backticks.
 > This is because activating the screensaver after a set period of inactivity relies on setting
 > the TMOUT environment variable in your _current shell_, instead of the child shell created by
@@ -90,3 +97,9 @@ This includes a decent variety of terminals, but I have personally confirmed goo
 - WezTerm (macOS)
 - iTerm2 (macOS)
 
+### ssh
+
+Because bevy is being used here in a somewhat unconventional way, currently bevy will still look for a
+windowing system even though a window is never created. This means that there are issues when a window
+server is not available, for example when running this over SSH. I am investigating a fix, perhaps through
+disabling a default bevy feature.
