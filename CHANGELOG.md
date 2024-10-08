@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/cxreiff/ttysvr/compare/v0.3.0...v0.3.1) - 2024-10-08
+
+### Other
+
+- updated README with linux note, added wayland
+- add instructions for arch linux
+
 ## [0.3.0](https://github.com/cxreiff/ttysvr/compare/v0.2.1...v0.3.0) - 2024-10-03
 
 ### Added
