@@ -1,6 +1,6 @@
 [package]
 name = "ttysvr"
-description = "Screensavers for your terminal."
+description = "Screensavers for your terminal"
 version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,10 @@ repository = "https://github.com/cxreiff/ttysvr"
 homepage = "https://github.com/cxreiff/ttysvr"
 categories = ["command-line-interface"]
 keywords = ["bevy", "ratatui", "terminal", "tui", "screensaver"]
+
+[features]
+default = ["wayland"]
+wayland = ["bevy/wayland"]
 
 [dependencies]
 avian2d = "0.1.1"
