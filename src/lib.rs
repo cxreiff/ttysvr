@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use bevy::{app::ScheduleRunnerPlugin, log::LogPlugin, prelude::*, window::ExitCondition};
+use bevy::{
+    app::ScheduleRunnerPlugin, color::Color, log::LogPlugin, prelude::*, window::ExitCondition,
+};
 use bevy_ratatui::RatatuiPlugins;
 use bevy_ratatui_render::RatatuiRenderPlugin;
 use logo::LogoPath;
@@ -17,10 +19,13 @@ mod common;
 mod logo;
 mod maze;
 
-pub struct AppPlugin(pub SaverVariant);
+pub struct AppPlugin(pub Settings);
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
+        let saver = &self.0.saver;
+        let common = &self.0.common;
+
         app.add_plugins((
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
@@ -39,11 +44,11 @@ impl Plugin for AppPlugin {
 
         app.add_plugins((assets::plugin, common::plugin));
 
-        if let SaverVariant::Logo(ref logo_path) = self.0 {
+        if let SaverVariant::Logo(ref logo_path) = saver {
             app.insert_resource(LogoPath(logo_path.into()));
         }
 
-        match self.0 {
+        match saver {
             SaverVariant::Logo(ref logo_path) => {
                 app.insert_resource(LogoPath(logo_path.into()));
             }
@@ -53,11 +58,13 @@ impl Plugin for AppPlugin {
             _ => {}
         }
 
-        app.add_plugins(match self.0 {
+        app.add_plugins(match saver {
             SaverVariant::Bubbles => bubbles::plugin,
             SaverVariant::Logo(_) => logo::plugin,
             SaverVariant::Maze(_, _) => maze::plugin,
         });
+
+        app.insert_resource(ClearColor(common.clear_color));
     }
 }
 
@@ -81,4 +88,21 @@ impl Distribution<SaverVariant> for Standard {
             _ => SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into()),
         }
     }
+}
+
+pub struct CommonSettings {
+    pub clear_color: Color,
+}
+
+impl Default for CommonSettings {
+    fn default() -> Self {
+        CommonSettings {
+            clear_color: Color::srgb(0., 0., 0.),
+        }
+    }
+}
+
+pub struct Settings {
+    pub common: CommonSettings,
+    pub saver: SaverVariant,
 }
