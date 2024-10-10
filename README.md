@@ -99,7 +99,5 @@ This includes a decent variety of terminals, but I have personally confirmed goo
 
 ### ssh
 
-Because bevy is being used here in a somewhat unconventional way, currently bevy will still look for a
-windowing system even though a window is never created. This means that there are issues when a window
-server is not available, for example when running this over SSH. I am investigating a fix, perhaps through
-disabling a default bevy feature.
+I have recently added a change that has allowed me to run the screensavers over SSH. This is not very well
+tested however, so please open an issue if you run into problems!
