@@ -8,6 +8,8 @@ on:
 
 jobs:
   check:
+    uses: cxreiff/github_workflows/.github/workflows/rust_checks.yml@main
     permissions:
       checks: write
-    uses: cxreiff/github_workflows/.github/workflows/rust_checks.yml@main
+    secrets:
+      DEDICATED_TOKEN: ${{ secrets.DEDICATED_TOKEN }}
