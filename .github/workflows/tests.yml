@@ -12,5 +12,5 @@ jobs:
     secrets:
       DEDICATED_TOKEN: ${{ secrets.DEDICATED_TOKEN }}
     with:
-      crate_type: "bin"
-      linux_dependencies: "libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev"
+      crate_type: bin
+      linux_dependencies: libasound2-dev libudev-dev

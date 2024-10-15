@@ -13,3 +13,5 @@ jobs:
       checks: write
     secrets:
       DEDICATED_TOKEN: ${{ secrets.DEDICATED_TOKEN }}
+    with:
+      linux_dependencies: libasound2-dev libudev-dev

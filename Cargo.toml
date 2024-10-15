@@ -56,6 +56,4 @@ pr-run-mode = "plan"
 [workspace.metadata.dist.dependencies.apt]
 libasound2-dev = "*"
 libudev-dev = "*"
-libwayland-dev = "*"
-libxkbcommon-dev = "*"
 

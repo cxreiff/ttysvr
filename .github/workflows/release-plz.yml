@@ -19,4 +19,4 @@ jobs:
       DEDICATED_TOKEN: ${{ secrets.DEDICATED_TOKEN }}
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     with:
-      linux_dependencies: libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      linux_dependencies: libasound2-dev libudev-dev
