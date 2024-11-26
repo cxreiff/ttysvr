@@ -1,140 +1,41 @@
-use std::{env, fmt::Display};
+use std::env;
 
-use bevy::app::App;
-use clap::{Parser, Subcommand};
+use args::{Args, LogoVariant, MazeVariant, Variant};
+use bevy::{app::App, color::Srgba};
+use clap::Parser;
 use ttysvr::{
-    AppPlugin, SaverVariant, LOGO_PATH_DVD, LOGO_PATH_TTY, MAZE_CEILING_PATH_BRICK,
+    AppPlugin, SaverVariant, Settings, LOGO_PATH_DVD, LOGO_PATH_TTY, MAZE_CEILING_PATH_BRICK,
     MAZE_CEILING_PATH_HEDGE, MAZE_WALL_PATH_BRICK, MAZE_WALL_PATH_HEDGE,
 };
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-#[command(propagate_version = true)]
-struct Cli {
-    #[command(subcommand)]
-    variant: Option<Variant>,
-
-    #[arg(
-        short,
-        long,
-        global = true,
-        name = "DELAY",
-        help = "Prints command for initiating ttysvr in DELAY seconds."
-    )]
-    init: Option<u32>,
-
-    #[arg(
-        short,
-        long,
-        global = true,
-        help = "Prints command for cancelling ttysvr in current shell."
-    )]
-    cancel: bool,
-}
-
-#[derive(Subcommand)]
-pub enum Variant {
-    Bubbles,
-    Logo {
-        #[command(subcommand)]
-        variant: Option<LogoVariant>,
-    },
-    Maze {
-        #[command(subcommand)]
-        variant: Option<MazeVariant>,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum LogoVariant {
-    Dvd,
-    Tty,
-}
-
-#[derive(Subcommand)]
-pub enum MazeVariant {
-    Brick,
-    Hedge,
-}
-
-impl Display for Variant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Variant::Bubbles => write!(f, "bubbles"),
-            Variant::Logo { variant } => {
-                if let Some(variant) = variant {
-                    write!(f, "logo {variant}")
-                } else {
-                    write!(f, "logo")
-                }
-            }
-            Variant::Maze { variant } => {
-                if let Some(variant) = variant {
-                    write!(f, "maze {variant}")
-                } else {
-                    write!(f, "maze")
-                }
-            }
-        }
-    }
-}
-
-impl Display for LogoVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LogoVariant::Dvd => write!(f, "dvd"),
-            LogoVariant::Tty => write!(f, "tty"),
-        }
-    }
-}
-
-impl Display for MazeVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MazeVariant::Brick => write!(f, "brick"),
-            MazeVariant::Hedge => write!(f, "hedge"),
-        }
-    }
-}
+mod args;
 
 fn main() {
-    let Cli {
+    let Args {
         variant,
+        background,
         init,
         cancel,
-    } = Cli::parse();
-
-    let saver_variant = match variant {
-        Some(Variant::Bubbles) => SaverVariant::Bubbles,
-        Some(Variant::Logo { ref variant }) => match variant {
-            Some(LogoVariant::Dvd) | None => SaverVariant::Logo(LOGO_PATH_DVD.into()),
-            Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
-        },
-        Some(Variant::Maze { ref variant }) => match variant {
-            Some(MazeVariant::Brick) | None => {
-                SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into())
-            }
-            Some(MazeVariant::Hedge) => {
-                SaverVariant::Maze(MAZE_WALL_PATH_HEDGE.into(), MAZE_CEILING_PATH_HEDGE.into())
-            }
-        },
-        None => rand::random(),
-    };
+    } = Args::parse();
 
     if let Some(delay) = init {
         let executable_string = env::args().next().unwrap_or("ttysvr".into());
         let variant_string = match variant {
-            None => "".into(),
             Some(variant) => format!(" {variant}"),
+            None => "".into(),
+        };
+        let background_string = match background {
+            Some(background) => format!(" --bg={background}"),
+            None => "".into(),
         };
 
         #[rustfmt::skip]
         println!(
 "
-TMOUT={delay}; trap \"{executable_string}{variant_string}; zle reset-prompt\" ALRM
+TMOUT={delay}; trap \"{executable_string}{variant_string}{background_string}; zle reset-prompt\" ALRM
 
 # WRAP THIS COMMAND IN EVAL WITH BACKTICKS (ZSH ONLY)
-# EXAMPLE: eval `ttysvr{variant_string} --init {delay}`
+# EXAMPLE: eval `ttysvr{variant_string}{background_string} --init {delay}`
 "
         );
         return;
@@ -153,5 +54,27 @@ TMOUT=0
         return;
     }
 
-    App::new().add_plugins(AppPlugin(saver_variant)).run();
+    let saver_variant = match variant {
+        Some(Variant::Bubbles) => SaverVariant::Bubbles,
+        Some(Variant::Logo { ref variant }) => match variant {
+            Some(LogoVariant::Dvd) | None => SaverVariant::Logo(LOGO_PATH_DVD.into()),
+            Some(LogoVariant::Tty) => SaverVariant::Logo(LOGO_PATH_TTY.into()),
+        },
+        Some(Variant::Maze { ref variant }) => match variant {
+            Some(MazeVariant::Brick) | None => {
+                SaverVariant::Maze(MAZE_WALL_PATH_BRICK.into(), MAZE_CEILING_PATH_BRICK.into())
+            }
+            Some(MazeVariant::Hedge) => {
+                SaverVariant::Maze(MAZE_WALL_PATH_HEDGE.into(), MAZE_CEILING_PATH_HEDGE.into())
+            }
+        },
+        None => rand::random(),
+    };
+
+    let settings = Settings {
+        variant: saver_variant,
+        background: background.map_or(Srgba::NONE, |bg| bg.0),
+    };
+
+    App::new().add_plugins(AppPlugin(settings)).run();
 }

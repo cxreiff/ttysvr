@@ -19,7 +19,7 @@ mod common;
 mod logo;
 mod maze;
 
-pub struct AppPlugin(pub SaverVariant);
+pub struct AppPlugin(pub Settings);
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
@@ -37,11 +37,14 @@ impl Plugin for AppPlugin {
 
         app.add_plugins((assets::plugin, common::plugin));
 
-        if let SaverVariant::Logo(ref logo_path) = self.0 {
-            app.insert_resource(LogoPath(logo_path.into()));
-        }
+        let Settings {
+            ref variant,
+            ref background,
+        } = self.0;
 
-        match self.0 {
+        app.insert_resource(ClearColor(Color::Srgba(*background)));
+
+        match variant {
             SaverVariant::Logo(ref logo_path) => {
                 app.insert_resource(LogoPath(logo_path.into()));
             }
@@ -51,7 +54,7 @@ impl Plugin for AppPlugin {
             _ => {}
         }
 
-        app.add_plugins(match self.0 {
+        app.add_plugins(match variant {
             SaverVariant::Bubbles => bubbles::plugin,
             SaverVariant::Logo(_) => logo::plugin,
             SaverVariant::Maze(_, _) => maze::plugin,
@@ -63,6 +66,11 @@ impl Plugin for AppPlugin {
 pub struct Flags {
     _debug: bool,
     _msgs: Vec<String>,
+}
+
+pub struct Settings {
+    pub variant: SaverVariant,
+    pub background: Srgba,
 }
 
 pub enum SaverVariant {
