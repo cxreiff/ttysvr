@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4](https://github.com/cxreiff/ttysvr/compare/v0.3.3...v0.3.4) - 2024-11-27
+
+### Added
+
+- version bump for ratatui, bevy_ratatui, bevy_ratatui_render
+
+### Other
+
+- custom background color option
+- tweaks to workflows
+- added DEDICATED_TOKEN in workflows
+
 ## [0.3.3](https://github.com/cxreiff/ttysvr/compare/v0.3.2...v0.3.3) - 2024-10-12
 
 ### Other
