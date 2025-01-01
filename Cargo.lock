@@ -5084,7 +5084,7 @@ checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
 
 [[package]]
 name = "ttysvr"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "avian2d",
  "bevy",

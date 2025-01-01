@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5](https://github.com/cxreiff/ttysvr/compare/v0.3.4...v0.3.5) - 2025-01-01
+
+### Other
+
+- bevy 0.15, bevy_ratatui_camera 0.8
+
 ## [0.3.4](https://github.com/cxreiff/ttysvr/compare/v0.3.3...v0.3.4) - 2024-11-27
 
 ### Added
