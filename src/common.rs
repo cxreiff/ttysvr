@@ -4,7 +4,7 @@ use bevy::utils::error;
 use bevy::{diagnostic::DiagnosticsStore, prelude::*};
 use bevy_ratatui::event::{KeyEvent, MouseEvent};
 use bevy_ratatui::terminal::RatatuiContext;
-use bevy_ratatui_render::RatatuiRenderContext;
+use bevy_ratatui_camera::RatatuiCameraWidget;
 
 use crate::Flags;
 
@@ -21,23 +21,13 @@ pub(super) fn plugin(app: &mut App) {
 
 fn draw_scene_system(
     mut ratatui: ResMut<RatatuiContext>,
-    ratatui_render: Res<RatatuiRenderContext>,
+    widget: Query<&RatatuiCameraWidget>,
     _flags: Res<Flags>,
     _diagnostics: Res<DiagnosticsStore>,
 ) -> io::Result<()> {
     ratatui.draw(|frame| {
-        if let Some(widget) = ratatui_render.widget("main") {
+        if let Ok(widget) = widget.get_single() {
             frame.render_widget(widget, frame.area());
-
-            // frame.render_widget(
-            //     Paragraph::new(flags.msgs.join("\n")).fg(Color::DarkBlue),
-            //     ratatui::layout::Rect {
-            //         x: 1,
-            //         y: 1,
-            //         width: 30,
-            //         height: 30,
-            //     },
-            // );
         }
     })?;
 

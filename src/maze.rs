@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, f32::consts::PI};
 
-use avian2d::math::PI;
 use bevy::prelude::*;
-use bevy_ratatui_render::RatatuiRenderContext;
+use bevy_ratatui_camera::RatatuiCamera;
 use rand::{seq::SliceRandom, thread_rng};
 
 pub const MAZE_WALL_PATH_BRICK: &str = "embedded://ttysvr/../assets/maze_wall_brick.png";
@@ -22,8 +21,8 @@ type MazeGraph = BTreeMap<(i32, i32), (bool, bool, bool, bool)>;
 
 const MAZE_SIZE: i32 = 12;
 const MAZE_SCALE: f32 = 1.0;
-const MAZE_WALK_SPEED: f32 = 1.5;
-const MAZE_TURN_SPEED: f32 = 2.5;
+const MAZE_WALK_SPEED: f32 = 0.4;
+const MAZE_TURN_SPEED: f32 = 2.0;
 const WALL_DIMENSIONS: Vec3 = Vec3::new(1.0, 0.01, 1.0);
 const DIRECTION_LIST: &[MazeDirection] = &[
     MazeDirection::North,
@@ -111,7 +110,6 @@ fn maze_generation_system(mut commands: Commands) {
 
 fn maze_setup_system(
     mut commands: Commands,
-    ratatui_render: Res<RatatuiRenderContext>,
     maze: Res<Maze>,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -150,89 +148,72 @@ fn maze_setup_system(
         let translation = target_to_vec3((*x, *y));
 
         if !*north {
-            let transform =
-                Transform::default().with_translation(translation + Vec3::Y * MAZE_SCALE * 0.5);
-            commands.spawn(PbrBundle {
-                transform,
-                mesh: wall_mesh.clone(),
-                material: wall_material.clone(),
-                ..default()
-            });
+            commands.spawn((
+                Transform::default().with_translation(translation + Vec3::Y * MAZE_SCALE * 0.5),
+                Mesh3d(wall_mesh.clone()),
+                MeshMaterial3d(wall_material.clone()),
+            ));
         }
 
         if !*east {
-            let transform = Transform::default()
-                .with_translation(translation + Vec3::X * MAZE_SCALE * 0.5)
-                .with_rotation(Quat::from_rotation_z(PI / 2.));
-            commands.spawn(PbrBundle {
-                transform,
-                mesh: wall_mesh.clone(),
-                material: wall_material.clone(),
-                ..default()
-            });
+            commands.spawn((
+                Transform::default()
+                    .with_translation(translation + Vec3::X * MAZE_SCALE * 0.5)
+                    .with_rotation(Quat::from_rotation_z(PI / 2.)),
+                Mesh3d(wall_mesh.clone()),
+                MeshMaterial3d(wall_material.clone()),
+            ));
         }
 
         if !*south && *y == 0 {
-            let transform = Transform::default()
-                .with_translation(translation - Vec3::Y * MAZE_SCALE * 0.5)
-                .with_rotation(Quat::from_rotation_z(PI));
-            commands.spawn(PbrBundle {
-                transform,
-                mesh: wall_mesh.clone(),
-                material: wall_material.clone(),
-                ..default()
-            });
+            commands.spawn((
+                Transform::default()
+                    .with_translation(translation - Vec3::Y * MAZE_SCALE * 0.5)
+                    .with_rotation(Quat::from_rotation_z(PI)),
+                Mesh3d(wall_mesh.clone()),
+                MeshMaterial3d(wall_material.clone()),
+            ));
         }
 
         if !*west && *x == 0 {
-            let transform = Transform::default()
-                .with_translation(translation - Vec3::X * MAZE_SCALE * 0.5)
-                .with_rotation(Quat::from_rotation_z(PI * 3. / 2.));
-            commands.spawn(PbrBundle {
-                transform,
-                mesh: wall_mesh.clone(),
-                material: wall_material.clone(),
-                ..default()
-            });
+            commands.spawn((
+                Transform::default()
+                    .with_translation(translation - Vec3::X * MAZE_SCALE * 0.5)
+                    .with_rotation(Quat::from_rotation_z(PI * 3. / 2.)),
+                Mesh3d(wall_mesh.clone()),
+                MeshMaterial3d(wall_material.clone()),
+            ));
         }
 
-        commands.spawn(PbrBundle {
-            transform: Transform::default()
+        commands.spawn((
+            Transform::default()
                 .with_translation(translation - Vec3::Z * 0.5 * MAZE_SCALE * WALL_DIMENSIONS.z),
-            mesh: floor_ceiling_mesh.clone(),
-            material: floor_material.clone(),
-            ..default()
-        });
+            Mesh3d(floor_ceiling_mesh.clone()),
+            MeshMaterial3d(floor_material.clone()),
+        ));
 
-        commands.spawn(PbrBundle {
-            transform: Transform::default()
+        commands.spawn((
+            Transform::default()
                 .with_translation(translation + Vec3::Z * 0.5 * MAZE_SCALE * WALL_DIMENSIONS.z),
-            mesh: floor_ceiling_mesh.clone(),
-            material: ceiling_material.clone(),
-            ..default()
-        });
+            Mesh3d(floor_ceiling_mesh.clone()),
+            MeshMaterial3d(ceiling_material.clone()),
+        ));
     }
 
     commands
-        .spawn(Camera3dBundle {
-            camera: Camera {
-                target: ratatui_render.target("main").unwrap_or_default(),
-                ..default()
-            },
-            projection: Projection::Perspective(PerspectiveProjection {
+        .spawn((
+            Msaa::Sample8,
+            RatatuiCamera::autoresize().with_autoresize_fn(|(w, h)| (w * 4, h * 4)),
+            Camera3d::default(),
+            Projection::Perspective(PerspectiveProjection {
                 fov: PI / 2.,
                 ..default()
             }),
-            transform: Transform::from_translation(Vec3::new(0., 0., 0.))
-                .looking_at(Vec3::new(0., 1., 0.), Vec3::Z),
-            ..default()
-        })
+            Transform::default().looking_at(Vec3::Y, Vec3::Z),
+        ))
         .with_children(|commands| {
-            commands.spawn(PointLightBundle {
-                point_light: PointLight {
-                    intensity: 10_000.,
-                    ..default()
-                },
+            commands.spawn(PointLight {
+                intensity: 10_000.,
                 ..default()
             });
         });
@@ -242,9 +223,9 @@ fn movement_system(
     time: Res<Time>,
     maze: Res<Maze>,
     mut target: ResMut<MazeTarget>,
-    mut camera: Query<&mut Transform, With<Camera>>,
+    mut camera: Query<&mut Transform, With<Camera3d>>,
 ) {
-    let delta = time.delta_seconds();
+    let delta = time.delta_secs();
     let mut camera_transform = camera.single_mut();
     let target_vec = target_to_vec3(**target);
 

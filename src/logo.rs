@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 use bevy_ratatui::event::ResizeEvent;
-use bevy_ratatui_render::RatatuiRenderContext;
+use bevy_ratatui_camera::RatatuiCamera;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
 pub const LOGO_PATH_DVD: &str = "embedded://ttysvr/../assets/dvd_logo.png";
 pub const LOGO_PATH_TTY: &str = "embedded://ttysvr/../assets/tty_logo.png";
 
+const STARTING_DIMENSIONS: (u32, u32) = (256, 256);
 const ORTHO_SCALING: f32 = 0.5;
 const LOGO_RADIUS: f32 = 32.;
 const LOGO_SPEED: f32 = 24.;
@@ -29,61 +30,47 @@ pub struct LogoPath(pub String);
 #[derive(Resource, Deref, DerefMut, Default)]
 struct LogoVisibleRegion(Vec2);
 
-#[derive(Bundle)]
-struct LogoBundle {
-    logo: Logo,
-    sprite: SpriteBundle,
-}
-
-impl LogoBundle {
-    fn new(rng: &mut ChaCha8Rng, texture: Handle<Image>, region: Rectangle) -> Self {
-        Self {
-            logo: Logo {
-                velocity: Vec2::new(LOGO_SPEED, -LOGO_SPEED),
-            },
-            sprite: SpriteBundle {
-                transform: Transform::from_translation(region.sample_interior(rng).extend(0.)),
-                texture,
-                sprite: Sprite {
-                    color: Color::hsl(0., 1.0, 0.6),
-                    custom_size: Some(Vec2::splat(LOGO_RADIUS * 2.)),
-                    ..default()
-                },
-                ..default()
-            },
-        }
-    }
-}
-
 fn logo_setup_system(
     mut commands: Commands,
-    ratatui_render: Res<RatatuiRenderContext>,
     asset_server: Res<AssetServer>,
     mut visible_region: ResMut<LogoVisibleRegion>,
     logo_path: Res<LogoPath>,
 ) {
-    let mut camera = Camera2dBundle::default();
-    camera.projection.scale = ORTHO_SCALING;
-    camera.camera.target = ratatui_render.target("main").unwrap_or_default();
-    commands.spawn(camera);
+    commands.spawn((
+        RatatuiCamera::autoresize().with_dimensions(STARTING_DIMENSIONS),
+        Camera2d,
+        OrthographicProjection {
+            scale: ORTHO_SCALING,
+            ..OrthographicProjection::default_2d()
+        },
+    ));
 
-    **visible_region = get_visible_region(&ratatui_render);
-    let texture = asset_server.load(&**logo_path);
+    **visible_region = get_visible_region(STARTING_DIMENSIONS);
+    let image = asset_server.load(&**logo_path);
     let mut rng = ChaCha8Rng::seed_from_u64(19878367467712);
-    commands.spawn(LogoBundle::new(
-        &mut rng,
-        texture,
-        Rectangle::from_size(**visible_region * 0.5 - LOGO_RADIUS * 2.),
+    let region = Rectangle::from_size(**visible_region * 0.5 - LOGO_RADIUS * 2.);
+
+    commands.spawn((
+        Logo {
+            velocity: Vec2::new(LOGO_SPEED, -LOGO_SPEED),
+        },
+        Sprite {
+            image,
+            color: Color::hsl(0., 1., 0.6),
+            custom_size: Some(Vec2::splat(LOGO_RADIUS * 2.)),
+            ..default()
+        },
+        Transform::from_translation(region.sample_interior(&mut rng).extend(0.)),
     ));
 }
 
 fn handle_resize_system(
     mut resize_events: EventReader<ResizeEvent>,
     mut visible_region: ResMut<LogoVisibleRegion>,
-    ratatui_render: Res<RatatuiRenderContext>,
 ) {
-    for _ in resize_events.read() {
-        **visible_region = get_visible_region(&ratatui_render);
+    for resize in resize_events.read() {
+        let (width, height) = (resize.width * 2, resize.height * 4);
+        **visible_region = get_visible_region((width as u32, height as u32));
     }
 }
 
@@ -96,7 +83,7 @@ fn logo_movement_system(
         let visible_area = Rectangle::from_size(**visible_region - LOGO_RADIUS * 1.95);
         let visible_half = visible_area.half_size.extend(0.);
 
-        transform.translation += velocity.extend(0.) * time.delta_seconds();
+        transform.translation += velocity.extend(0.) * time.delta_secs();
 
         if (transform.translation.x < -visible_half.x && velocity.x < 0.)
             || (transform.translation.x > visible_half.x && velocity.x > 0.)
@@ -116,8 +103,7 @@ fn logo_movement_system(
     }
 }
 
-fn get_visible_region(ratatui_render: &RatatuiRenderContext) -> Vec2 {
-    let (width, height) = ratatui_render.dimensions("main").unwrap();
+fn get_visible_region((width, height): (u32, u32)) -> Vec2 {
     let terminal_dimensions = Vec2::new(width as f32, height as f32);
     terminal_dimensions * ORTHO_SCALING
 }

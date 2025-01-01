@@ -12,10 +12,10 @@ categories = ["command-line-interface"]
 keywords = ["bevy", "ratatui", "terminal", "tui", "screensaver"]
 
 [dependencies]
-avian2d = "0.1.1"
-bevy = "0.14.2"
-bevy_ratatui = "0.6.4"
-bevy_ratatui_render = "0.6.0"
+avian2d = { git = "https://github.com/Jondolf/avian.git", branch = "main" }
+bevy = "0.15.0"
+bevy_ratatui = "0.7.0"
+bevy_ratatui_camera = "0.8.2"
 clap = { version = "4.5.13", features = ["derive"] }
 rand = "0.8.5"
 rand_chacha = "0.3.1"

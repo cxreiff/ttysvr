@@ -5,7 +5,7 @@ use avian2d::{
 };
 use bevy::prelude::*;
 use bevy_ratatui::event::ResizeEvent;
-use bevy_ratatui_render::RatatuiRenderContext;
+use bevy_ratatui_camera::RatatuiCamera;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
@@ -49,41 +49,36 @@ pub struct BubbleSprite(Handle<Image>);
 #[derive(Resource, Deref, DerefMut, Default)]
 pub struct BubbleVisibleRegion(Vec2);
 
-#[derive(Bundle)]
-pub struct BubbleBundle {
-    bubble: Bubble,
-    sprite: SpriteBundle,
-    rigidbody: RigidBody,
-    collider: Collider,
-    locked_axes: LockedAxes,
-    friction: Friction,
-}
-
-impl BubbleBundle {
-    fn new(rng: &mut BubbleRng, sprite: &BubbleSprite, region: &Rectangle) -> Self {
-        Self {
-            bubble: Bubble {
-                target: region.sample_interior(&mut rng.0),
-                timer: Timer::from_seconds(3., TimerMode::Repeating),
-            },
-            sprite: SpriteBundle {
-                transform: Transform::from_translation(
-                    region.sample_interior(&mut rng.0).extend(0.),
-                ),
-                texture: (**sprite).clone(),
-                sprite: Sprite {
-                    color: Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.8),
-                    custom_size: Some(Vec2::splat(BUBBLE_RADIUS * 2.)),
-                    ..default()
-                },
-                ..default()
-            },
-            rigidbody: RigidBody::Dynamic,
-            collider: Collider::circle(BUBBLE_RADIUS as Scalar),
-            locked_axes: LockedAxes::ROTATION_LOCKED,
-            friction: Friction::new(0.0),
-        }
-    }
+fn create_bubble(
+    rng: &mut BubbleRng,
+    sprite: &BubbleSprite,
+    region: &Rectangle,
+) -> (
+    Bubble,
+    Sprite,
+    Transform,
+    RigidBody,
+    Collider,
+    LockedAxes,
+    Friction,
+) {
+    (
+        Bubble {
+            target: region.sample_interior(&mut rng.0),
+            timer: Timer::from_seconds(3., TimerMode::Repeating),
+        },
+        Sprite {
+            image: (**sprite).clone(),
+            color: Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.8),
+            custom_size: Some(Vec2::splat(BUBBLE_RADIUS * 2.)),
+            ..default()
+        },
+        Transform::from_translation(region.sample_interior(&mut rng.0).extend(0.)),
+        RigidBody::Dynamic,
+        Collider::circle(BUBBLE_RADIUS as Scalar),
+        LockedAxes::ROTATION_LOCKED,
+        Friction::new(0.0),
+    )
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -95,15 +90,15 @@ impl Default for BubbleTimer {
     }
 }
 
-fn bubbles_setup_system(
-    mut commands: Commands,
-    ratatui_render: Res<RatatuiRenderContext>,
-    asset_server: Res<AssetServer>,
-) {
-    let mut camera = Camera2dBundle::default();
-    camera.projection.scale = ORTHO_SCALING;
-    camera.camera.target = ratatui_render.target("main").unwrap_or_default();
-    commands.spawn(camera);
+fn bubbles_setup_system(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scale: ORTHO_SCALING,
+            ..OrthographicProjection::default_2d()
+        }),
+        RatatuiCamera::autoresize(),
+    ));
 
     let rng = ChaCha8Rng::seed_from_u64(19878367467712);
     commands.insert_resource(BubbleRng(rng));
@@ -126,7 +121,7 @@ fn bubbles_spawn_system(
     timer.tick(time.delta());
     if timer.finished() && *count < **spawn_amount {
         *count += 1;
-        commands.spawn(BubbleBundle::new(
+        commands.spawn(create_bubble(
             &mut rng,
             &sprite,
             &Rectangle::from_size(**visible_region - BUBBLE_RADIUS * 2.),
@@ -138,10 +133,9 @@ fn handle_resize_system(
     mut resize_events: EventReader<ResizeEvent>,
     mut visible_region: ResMut<BubbleVisibleRegion>,
     mut spawn_amount: ResMut<BubbleAmount>,
-    ratatui_render: Res<RatatuiRenderContext>,
 ) {
-    for _ in resize_events.read() {
-        let (width, height) = ratatui_render.dimensions("main").unwrap();
+    for resize in resize_events.read() {
+        let (width, height) = (resize.width * 2, resize.height * 4);
         let terminal_dimensions = Vec2::new(width as f32, height as f32);
         **visible_region = terminal_dimensions * ORTHO_SCALING;
         **spawn_amount = ((visible_region.x * visible_region.y) / 777.) as u32;
@@ -170,7 +164,7 @@ fn bubble_movement_system(
 
         bubble.target = bubble
             .target
-            .move_towards(next_point, time.delta_seconds() * 10.);
+            .move_towards(next_point, time.delta_secs() * 10.);
 
         **velocity += diff * 0.01;
         **velocity = velocity.clamp(
@@ -183,7 +177,7 @@ fn bubble_movement_system(
 
 fn bubble_color_system(time: Res<Time>, mut bubbles: Query<&mut Sprite, With<Bubble>>) {
     for mut sprite in &mut bubbles {
-        let new_hue = (sprite.color.hue() + time.delta_seconds() * 10.) % 360.;
+        let new_hue = (sprite.color.hue() + time.delta_secs() * 10.) % 360.;
         sprite.color.set_hue(new_hue);
     }
 }

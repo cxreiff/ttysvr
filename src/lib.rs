@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::winit::WinitPlugin;
 use bevy::{app::ScheduleRunnerPlugin, log::LogPlugin};
 use bevy_ratatui::RatatuiPlugins;
-use bevy_ratatui_render::RatatuiRenderPlugin;
+use bevy_ratatui_camera::RatatuiCameraPlugin;
 use logo::LogoPath;
 pub use logo::{LOGO_PATH_DVD, LOGO_PATH_TTY};
 use maze::MazePaths;
@@ -30,9 +30,8 @@ impl Plugin for AppPlugin {
                 .disable::<LogPlugin>(),
             ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(1. / 60.)),
             RatatuiPlugins::default(),
-            RatatuiRenderPlugin::new("main", (256, 256)).autoresize(),
+            RatatuiCameraPlugin,
         ))
-        .insert_resource(Msaa::Off)
         .init_resource::<Flags>();
 
         app.add_plugins((assets::plugin, common::plugin));
