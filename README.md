@@ -8,7 +8,7 @@ Screensavers for your terminal. Start immediately or after a period of inactivit
 <img src="https://assets.cxreiff.com/github/ttysvr_maze.gif?" width="30%">
 <p>
 
-Uses [bevy_ratatui_render](https://github.com/cxreiff/bevy_ratatui_render), my
+Uses [bevy_ratatui_camera](https://github.com/cxreiff/bevy_ratatui_camera), my
 bevy plugin that allows you to render a bevy application to the terminal using
 [ratatui](https://github.com/ratatui-org/ratatui) and
 [ratatui-image](https://github.com/benjajaja/ratatui-image).
