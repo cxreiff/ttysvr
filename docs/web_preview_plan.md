@@ -90,43 +90,66 @@ bevy_ratatui_camera releases 0.18 support; nothing in this plan blocks that.
   - Removing the avian git dependency restores `cargo install --locked`
     friendliness.
 
-## 3. The one real blocker: GPU readback on WASM
+## 3. GPU readback on WASM: what changed between wgpu 23 and 24
 
 `bevy_ratatui_camera`'s readback (`src/camera_image_pipe.rs::send_image_buffer`)
 does:
 
 ```rust
 buffer_slice.map_async(MapMode::Read, ..);
-render_device.poll(PollType::wait());   // blocks until GPU done
-r.recv().expect(..);                    // blocks on channel
+render_device.poll(PollType::wait());   // wait for GPU
+r.recv().expect(..);                    // blocking channel recv
 ```
 
-On native this is fine. On `wasm32-unknown-unknown` **it deadlocks**: the
-browser cannot block the main thread — `poll(wait)` cannot actually wait on
-web, `map_async` callbacks are only delivered by the browser event loop after
-the current task yields, so the `recv()` never returns.
+This pattern **has worked in browser builds historically** — existing
+bevy_ratatui_camera web apps (bevy ≤0.15 era) are the proof — but the reason
+it worked was a wgpu-core bug, and the ground shifted under it in wgpu 24:
 
-**Fix (upstream, in bevy_ratatui_camera — which we maintain):** make the
-readback asynchronous across frames instead of synchronous within one:
+- **wgpu ≤23 (bevy ≤0.15), WebGL2 backend:** a wgpu-core bug
+  ([gfx-rs/wgpu#4589](https://github.com/gfx-rs/wgpu/issues/4589)) made
+  `poll(Wait)` treat GL fences as already signalled. The mapping callback
+  fired inline during `poll`, `recv()` returned immediately, and the actual
+  data copy (`getBufferSubData`) is a synchronous WebGL2 call — so readback
+  produced correct frames (at the cost of a pipeline stall). This is why the
+  blocking pattern was fine on the web.
+- **wgpu 24+ (bevy 0.16+), WebGL2 backend:** the bug was fixed (wgpu 24
+  changelog, PRs #6942/#7030). `poll(Wait)` on WebGL now returns `Timeout`
+  unless the submission has already completed — WebGL sync objects only
+  signal after control returns to the browser event loop, which never happens
+  mid-system — so the callback doesn't fire and `recv()` hangs. wgpu added an
+  explicit opt-in to restore the old behavior:
+  `GlBackendOptions::fence_behavior = GlFenceBehavior::AutoFinish`, documented
+  precisely for code that calls `device.poll(PollType::Wait)` on WebGL.
+  **Bevy hardcodes `GlFenceBehavior::Normal`** in `initialize_renderer`
+  (checked: 0.17, 0.18, and current main) and does not expose it in
+  `WgpuSettings`.
+- **WebGPU backend (any version):** `poll` cannot wait and `mapAsync`
+  resolves only via the JS event loop, so the blocking pattern deadlocks
+  there regardless of fence settings.
 
-- Option A (preferred): replace the custom render node + blocking channel
-  with Bevy's built-in `bevy::render::gpu_readback::Readback` component /
-  `ReadbackComplete` events, which already implement the non-blocking
-  map-then-harvest-next-frame pattern and are web-compatible.
-- Option B (surgical): keep the render node, but split `send_image_buffer`:
-  frame N issues `copy_texture_to_buffer` + `map_async`; frame N+1 (or later)
-  checks the map result with `try_recv`, copies the mapped range, unmaps.
-  Native keeps the fast path behind `#[cfg(not(target_arch = "wasm32"))]` if
-  the one-frame latency matters (for a screensaver it does not).
+So after the Phase 1 upgrade to bevy 0.17, the web build needs one of:
 
-Ship as `bevy_ratatui_camera` 0.17 (or 0.16.1), or consume via a
-`[patch.crates-io]` git dependency in ttysvr until released. This is the only
-piece of the stack that needs actual new code rather than migration.
+- **Option A — restore AutoFinish fences (no changes to bevy_ratatui_camera):**
+  in ttysvr's web entry point, create the wgpu instance/adapter/device
+  manually with `fence_behavior: GlFenceBehavior::AutoFinish` and hand it to
+  bevy via `RenderPlugin { render_creation: RenderCreation::Manual(..) }`.
+  WebGL2-only, preserves the crate as-is, and matches the semantics the old
+  working web apps had. A small upstream bevy PR exposing `fence_behavior` in
+  `WgpuSettings` would later reduce this to one line.
+- **Option B — async readback in bevy_ratatui_camera (upstream, we maintain
+  it):** split the readback across frames (issue `map_async` in frame N,
+  harvest with `try_recv` in frame N+1, or adopt bevy's built-in
+  `gpu_readback::Readback`). Removes the WebGL stall, and is the only route
+  that also unlocks the **WebGPU** backend. Ship as 0.16.1/0.17 or consume
+  via `[patch.crates-io]` until released.
 
-Renderer backend: build the web bundle with Bevy's `webgpu` feature as the
-primary target (Chrome/Edge/Firefox/Safari all ship WebGPU now; buffer
-readback is fully supported). WebGL2 readback works in wgpu but with known
-warnings/perf caveats — treat it as a fallback build flag, not the default.
+Recommendation: A first (fast, low-risk, proven semantics), B as the durable
+follow-up. First step of Phase 3 is a spike that confirms this analysis
+empirically: build one bevy_ratatui_camera example for wasm on bevy 0.17 +
+WebGL2, observe the hang, then confirm AutoFinish fixes it.
+
+Renderer backend: target **WebGL2** for the web build (bevy's wasm default).
+WebGPU only becomes viable after Option B.
 
 ## 4. Restructuring ttysvr for a second target
 
@@ -200,10 +223,13 @@ Add the `terminal`/`windowed` features and plugin branching; verify
 `cargo run --features windowed -- maze` shows the TUI in a native window.
 This proves the soft_ratatui path before wasm enters the picture.
 
-**Phase 3 — wasm-compatible readback in bevy_ratatui_camera.**
-Implement §3 (async readback) on a branch of bevy_ratatui_camera; consume via
-`[patch.crates-io]`; verify the bevy_ratatui_camera examples run in-browser
-with WebGPU; upstream + release, then drop the patch.
+**Phase 3 — readback on wasm.**
+Spike: build a bevy_ratatui_camera example for wasm (bevy 0.17, WebGL2) and
+confirm the §3 analysis (hang under `GlFenceBehavior::Normal`, working under
+`AutoFinish`). Then implement Option A (`RenderCreation::Manual` with
+AutoFinish fences in the web entry point). Option B (async readback upstream
+in bevy_ratatui_camera, unlocking WebGPU) proceeds afterwards as an
+independent track.
 
 **Phase 4 — ttysvr web target + server.**
 wasm entry point, query-string settings, `web/index.html`, `Trunk.toml`,
@@ -213,8 +239,12 @@ resize reflows the TUI grid.
 
 ## 7. Risks / open questions
 
-- **Readback on WebGL2** is flaky (wgpu warnings, driver variance) — WebGPU
-  is the supported target; WebGL2 stays experimental.
+- **AutoFinish fences** trade correctness-of-completion-signals for the old
+  pre-wgpu-24 semantics: `on_completed_work_done`/`poll(Wait)` report done
+  before the GPU actually finishes. For this readback pattern that's safe in
+  practice (the WebGL2 `getBufferSubData` copy is itself synchronizing), but
+  it's the part of §3 Option A most worth validating in the Phase 3 spike.
+- **WebGPU** stays off the table until §3 Option B (async readback) lands.
 - **avian on wasm**: avian2d works on wasm (single-threaded); if anything
   misbehaves, the bubbles variant is the only consumer and can temporarily
   swap physics for simple integration.
